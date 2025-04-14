@@ -54,7 +54,13 @@ BIAS-IN-AI-GENERATED-TRAVEL-NARRATIVES/
      ```
      YOUTUBE_API_KEY=your_api_key_here
      ```
-
+  
+  - **Don't have a YouTube API key?**
+     - Visit the official [Google Cloud Console](https://console.cloud.google.com/apis/dashboard) and create a new project.
+     - Enable the **YouTube Data API v3** for your project.
+     - Go to **Credentials > Create API key** and copy it into your `.env` file.
+     - Need help? Watch this beginner-friendly [YouTube tutorial on getting a YouTube API key](https://www.youtube.com/watch?v=th5_9woFJmk).
+     
 4. **Details about Each File:**
    - **VIDEO_ID_FILE:** Path to the file containing YouTube video IDs (default: `data/video_ids.txt`)
    - **OUTPUT_FILE:** Path to the output JSON file (default: `data/output/youtube_data.json`)
