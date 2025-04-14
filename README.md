@@ -42,7 +42,7 @@ BIAS-IN-AI-GENERATED-TRAVEL-NARRATIVES/
 1. **Clone the Repository:**  
    Open your terminal and run:  
    ```bash
-   git clone https://github.com/yourusername/BIAS-IN-AI-GENERATED-TRAVEL-NARRATIVES.git
+   git clone https://github.com/soorajmanoj/Bias-in-AI-Generated-Travel-Narratives.git
    cd BIAS-IN-AI-GENERATED-TRAVEL-NARRATIVES
 
 2. **Install Dependencies:**
