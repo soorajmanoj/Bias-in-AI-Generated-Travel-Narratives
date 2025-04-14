@@ -9,20 +9,21 @@ travel-related advice while identifying the key themes in the viewers responses.
 
 ## Project Structure
 
-|--- BIAS-IN-AI-GENERATED-TRAVEL-NARRATIVES
-|    |--- .env.example
-|    |--- .gitignore
-|    |--- README.md
-|    |--- requirements.txt
-|    |--- data
-|    |    |--- output
-|    |    |    |--- youtube_data.json
-|    |    |    |--- video_ids.txt
-|    |
-|    |--- src
-|         |--- api.py
-|         |--- fetcher.py
-|         |--- main.py
+```plaintext
+BIAS-IN-AI-GENERATED-TRAVEL-NARRATIVES/
+├── .env.example            # Example environment file. Copy to .env and add your YouTube API key.
+├── .gitignore              # Specifies files/folders for Git to ignore.
+├── README.md               # This documentation file.
+├── requirements.txt        # Python dependencies.
+├── data
+│   ├── output
+│   │   └── youtube_data.json  # JSON file with fetched data.
+│   └── video_ids.txt       # File listing YouTube video IDs (one per line).
+├── src
+│   ├── api.py              # Contains function to initialize YouTube API service.
+│   └── fetcher.py          # Contains functions to fetch video details and comments.
+└── main.py                 # Main script to orchestrate the data collection.
+```
 
 ---
 
@@ -57,6 +58,8 @@ travel-related advice while identifying the key themes in the viewers responses.
    OUTPUT_FILE: Path to the output JSON file (default: data/output/youtube_data.json)
    MAX_COMMENTS: Maximum number of comments to fetch per video (default: 20)
 
+---
+
 ## Data Collection & Preparation
 
 Obtain YouTube Video IDs:
@@ -79,7 +82,12 @@ Data Verification:
 
      Verify that the data is correctly downloaded and formatted by inspecting the output JSON file.
 
+---
+
 ## Running the code:
-   Command to run the project:
-   python main.py
+   To run the project, open your terminal and run:
+   ```bash
+   python main.py 
    The script will load environment variables, fetch the details for each video ID specified in data/video_ids.txt, and save the data into the designated output file data/output/youtube_data.json.
+
+---
