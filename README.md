@@ -49,45 +49,44 @@ BIAS-IN-AI-GENERATED-TRAVEL-NARRATIVES/
    python -m pip install -r requirements.txt
 
 3. **Configure Environment Variables:**
-    Copy the provided .env.example file to a new file named .env:
-    Open the .env file and add your own YouTube API key:
-    "YOUTUBE_API_KEY=your_api_key_here"
+   - Copy the provided `.env.example` file to a new file named `.env`
+   - Open the `.env` file and add your own YouTube API key, for example:
+     ```
+     YOUTUBE_API_KEY=your_api_key_here
+     ```
 
-4. **Deatils about each file:**
-   VIDEO_ID_FILE: Path to the file containing YouTube video IDs (default: data/video_ids.txt)
-   OUTPUT_FILE: Path to the output JSON file (default: data/output/youtube_data.json)
-   MAX_COMMENTS: Maximum number of comments to fetch per video (default: 20)
+4. **Details about Each File:**
+   - **VIDEO_ID_FILE:** Path to the file containing YouTube video IDs (default: `data/video_ids.txt`)
+   - **OUTPUT_FILE:** Path to the output JSON file (default: `data/output/youtube_data.json`)
+   - **MAX_COMMENTS:** Maximum number of comments to fetch per video (default: `20`)
+
 
 ---
 
 ## Data Collection & Preparation
 
-Obtain YouTube Video IDs:
+- **Obtain YouTube Video IDs:**
+  - List the YouTube video IDs you want to analyze in the `data/video_ids.txt` file.
+  - Ensure each video ID is on a separate line.
 
-    List the YouTube video IDs you want to analyze in the data/video_ids.txt file.
+- **Data Fetching:**
+  - The main script (`main.py`) will:
+    - Read the video IDs from the file.
+    - Use your YouTube API key to fetch video details and comments.
+    - Save the data in `data/output/youtube_data.json`.
 
-    Ensure each video ID is on a separate line.
-
-Data Fetching:
-
-    The main script (main.py) will:
-
-       Read the video IDs from the file.
-
-       Use your YouTube API key to fetch video details and comments.
-
-       Save the data in data/output/youtube_data.json.
-
-Data Verification:
-
-     Verify that the data is correctly downloaded and formatted by inspecting the output JSON file.
+- **Data Verification:**
+  - Verify that the data is correctly downloaded and formatted by inspecting the output JSON file.
 
 ---
 
-## Running the code:
-   To run the project, open your terminal and run:
-   ```bash
-   python main.py 
-   The script will load environment variables, fetch the details for each video ID specified in data/video_ids.txt, and save the data into the designated output file data/output/youtube_data.json.
+## Running the Code
 
----
+- **To run the project, open your terminal and run:**
+
+  ```bash
+  python main.py
+- **The script will:**
+   - Load environment variables.
+   - Fetch the details for each video ID specified in data/video_ids.txt.
+   - Save the data into the designated output file data/output/youtube_data.json.
