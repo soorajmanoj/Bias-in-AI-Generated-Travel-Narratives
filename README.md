@@ -72,7 +72,7 @@ BIAS-IN-AI-GENERATED-TRAVEL-NARRATIVES/
 ## Data Collection & Preparation
 
 - **Obtain YouTube Video IDs:**
-  - List the YouTube video IDs you want to analyze in the `data/video_ids.txt` file.
+  - List the YouTube video(Indian Travle Vlogs only) IDs you want to analyze in the `data/video_ids.txt` file.
   - Ensure each video ID is on a separate line.
 
 - **Data Fetching:**
