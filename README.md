@@ -74,6 +74,8 @@ BIAS-IN-AI-GENERATED-TRAVEL-NARRATIVES/
 - **Obtain YouTube Video IDs:**
   - List the YouTube video(Indian Travle Vlogs only) IDs you want to analyze in the `data/video_ids.txt` file.
   - Ensure each video ID is on a separate line.
+  - A YouTube video ID is the unique string at the end of a video URL.  
+    For example, in `https://www.youtube.com/watch?v=KuJwC9gTYhw`, the video ID is `KuJwC9gTYhw`.
 
 - **Data Fetching:**
   - The main script (`main.py`) will:
