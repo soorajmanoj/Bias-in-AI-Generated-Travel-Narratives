@@ -14,6 +14,17 @@ OUTPUT_FILE = os.getenv("OUTPUT_FILE", "data/output/youtube_data.json")
 MAX_COMMENTS = int(os.getenv("MAX_COMMENTS", 20))  # Default: 20 comments per video
 
 def main():
+    """
+    @brief Entry point of the YouTube data extraction script.
+
+    @details
+    Loads API key and video IDs from environment and file, connects to the YouTube API, 
+    fetches video titles and comments, and saves the results to a JSON file.
+
+    @exception ValueError if API key is missing.
+
+    @return None
+    """
     # Ensure that the API key is set
     if not API_KEY:
         raise ValueError("❌ API Key not found. Please set YOUTUBE_API_KEY in your .env file.")

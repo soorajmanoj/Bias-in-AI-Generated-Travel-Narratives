@@ -1,9 +1,11 @@
 def get_video_details(youtube, video_id):
     """
-    Fetch video details from YouTube.
-    :param youtube: YouTube API service instance
-    :param video_id: ID of the YouTube video
-    :return: Title of the video
+    @brief Fetches video title from the YouTube API.
+
+    @param youtube YouTube API service instance.
+    @param video_id The ID of the YouTube video.
+
+    @return The title of the video if found, otherwise None.
     """
     request = youtube.videos().list(part="snippet", id=video_id)
     response = request.execute()
@@ -15,11 +17,13 @@ def get_video_details(youtube, video_id):
 
 def get_video_comments(youtube, video_id, max_comments=20):
     """
-    Fetch comments from a YouTube video.
-    :param youtube: YouTube API service instance
-    :param video_id: ID of the YouTube video
-    :param max_comments: Maximum number of comments to fetch
-    :return: List of comments
+    @brief Retrieves top-level comments from a YouTube video.
+
+    @param youtube YouTube API service instance.
+    @param video_id The ID of the YouTube video.
+    @param max_comments Maximum number of comments to fetch (default is 20).
+
+    @return A list of comment strings.
     """
     comments = []
     request = youtube.commentThreads().list(
