@@ -20,9 +20,10 @@ BIAS-IN-AI-GENERATED-TRAVEL-NARRATIVES/
 │   │   └── youtube_data.json  # JSON file with fetched data.
 │   └── video_ids.txt       # File listing YouTube video IDs (one per line).
 ├── src
-│   ├── api.py              # Contains function to initialize YouTube API service.
-│   └── fetcher.py          # Contains functions to fetch video details and comments.
-└── main.py                 # Main script to orchestrate the data collection.
+    ├── api.py              # Contains function to initialize YouTube API service.
+    ├── fetcher.py          # Contains functions to fetch video details and comments.
+    └── main.py                 # Main script to orchestrate the data collection.
+
 ```
 
 ---
@@ -93,7 +94,7 @@ BIAS-IN-AI-GENERATED-TRAVEL-NARRATIVES/
 - **To run the project, open your terminal and run:**
 
   ```bash
-  python main.py
+  python src/main.py
 - **The script will:**
    - Load environment variables.
    - Fetch the details for each video ID specified in data/video_ids.txt.
