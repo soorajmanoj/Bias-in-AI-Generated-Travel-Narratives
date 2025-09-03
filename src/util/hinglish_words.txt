@@ -1,0 +1,25 @@
+# Common transliterated Hindi words (lowercase)
+hai
+haan
+nahi
+kya
+kyun
+accha
+bahut
+mera
+meri
+tum
+yaar
+bhai
+ka
+ki
+ke
+se
+mein
+aaj
+kal
+shukriya
+pyaar
+sahi
+galat
+dost
