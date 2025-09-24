@@ -1,3 +1,4 @@
+pyldavis
 google-api-python-client==2.121.0
 python-dotenv==1.0.1
 emoji~=2.14.1

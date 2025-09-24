@@ -1,0 +1,38 @@
+--- Top 10 Bigrams (2-word phrases) ---
+             Ngram  Frequency
+0      visit india        753
+1      civic sense        643
+2       north east        618
+3      south india        536
+4       india safe        451
+5      north india        432
+6       love india        404
+7  beautiful place        360
+8       come india        355
+9     travel india        330
+
+--- Top 10 Trigrams (3-word phrases) ---
+                   Ngram  Frequency
+0       north east india        266
+1       lack civic sense         88
+2       india safe women         81
+3       visit north east         74
+4       want visit india         74
+5      visit south india         66
+6    india worst country         64
+7        come north east         63
+8  visit northeast india         58
+9       come south india         58
+
+--- Top 10 Quadgrams (4-word phrases) ---
+                           Ngram  Frequency
+0          https www youtube com         48
+1         visit north east india         44
+2          come north east india         39
+3          www youtube com watch         33
+4          rato ra chandra surya         27
+5  country country indira gandhi         25
+6        thank thank thank thank         24
+7       india rape capital world         22
+8      india worst country world         22
+9        tourist raped group men         18
