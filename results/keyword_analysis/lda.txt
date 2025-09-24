@@ -1,0 +1,14 @@
+Training of LDA model with 10 topics is complete.
+
+
+--- Top 10 words for each topic ---
+Topic 1: kerala india mumbai visit city welcome come delhi state food
+Topic 2: video videos best love amazing great thank vlog bro brother
+Topic 3: love nepal india assam lots bharat pakistan sri come kolkata
+Topic 4: india indian people indians north country like sense east south
+Topic 5: se story ho hi bhi ki ji ke cute ko
+Topic 6: beautiful place love like visit bro meghalaya nice nature beauty
+Topic 7: video guys channel point like finally 10 years bro got
+Topic 8: india country indian safe visit women like people bad sorry
+Topic 9: india english didn like know man driver world life guy
+Topic 10: people like travel india places experience want good make country
