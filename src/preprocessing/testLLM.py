@@ -3,10 +3,11 @@ import json
 import ollama
 import re
 import time
-import sys 
+import sys
 
-MODEL_NAME = 'gemma2:2b'
 
+MODEL_NAME = 'deepseek-r1:8b'
+COMMENT_LIMIT = 100 
 
 def format_time(seconds):
     """Converts seconds into a human-readable H:M:S format."""
@@ -37,8 +38,7 @@ def process_comment_with_llm(comment, model_name=MODEL_NAME):
     """Sends a single comment to the LLM for cleaning and classification."""
     system_prompt = (
         "You are a text processing expert. For the user comment, perform these tasks: "
-        "1. Clean the text by correcting spelling/grammar and removing emojis. "
-        "2. Classify the language into 'rom_hindi', 'english', or 'other'. "
+        "dont change the comment but just classify the language into 'rom_hindi'(romanized hindi), 'english', or 'other. "
         "Provide your response only as a valid JSON object with two keys: 'classification' and 'cleaned_text'."
     )
     try:
@@ -50,13 +50,12 @@ def process_comment_with_llm(comment, model_name=MODEL_NAME):
         raw_response_text = response['message']['content']
         return extract_json_from_string(raw_response_text)
     except Exception as e:
-
         print(f"\n  - Error processing comment: {e}")
         return None
 
 
 input_filepath = os.path.join('..', '..', 'data', 'raw', 'youtube_data.json')
-output_filepath = os.path.join('..', '..', 'data', 'clean', 'llm_cleaned_data_full.json')
+output_filepath = os.path.join('..', '..', 'data', 'clean','tests', 'llm_cleaned_data_test.json')
 
 try:
     with open(input_filepath, 'r', encoding='utf-8') as f:
@@ -66,19 +65,21 @@ except FileNotFoundError:
     exit()
 
 all_cleaned_data = []
-print(f"🚀 Starting data cleaning process with model '{MODEL_NAME}' ...")
+print(f"🚀 Starting data cleaning process with model '{MODEL_NAME}' (limit: {COMMENT_LIMIT} comments)...")
 
-for video_object in data[:1]:
+for video_object in data:
     if not isinstance(video_object, dict) or "video_id" not in video_object:
         continue
 
     video_id = video_object["video_id"]
     print(f"Processing video: {video_id}")
-    comments_to_process = video_object.get("comments", [])
+    
+
+    comments_to_process = video_object.get("comments", [])[:COMMENT_LIMIT]
     total_comments = len(comments_to_process)
     
     if not comments_to_process:
-        continue
+        break 
 
     cleaned_data = {
         "video_id": video_id,
@@ -87,12 +88,11 @@ for video_object in data[:1]:
         "other": []
     }
 
-   
-    start_time = time.time() 
+    start_time = time.time()
     for i, comment in enumerate(comments_to_process):
         if not isinstance(comment, str) or not comment.strip():
             continue
-
+        
         result = process_comment_with_llm(comment)
         
         if result:
@@ -103,20 +103,22 @@ for video_object in data[:1]:
             else:
                 cleaned_data["other"].append(cleaned_text)
         
-        if i > 0: 
+        if i > 0:
             elapsed_time = time.time() - start_time
-            avg_time_per_comment = elapsed_time / (i + 1)
+
+            cps = (i + 1) / elapsed_time 
             comments_remaining = total_comments - (i + 1)
-            eta_seconds = avg_time_per_comment * comments_remaining
+            eta_seconds = (elapsed_time / (i + 1)) * comments_remaining
             formatted_eta = format_time(eta_seconds)
             
-            progress_bar = f"  - Processing comment {i + 1}/{total_comments}... ETA: {formatted_eta}   "
+            progress_bar = f"  - Processing comment {i + 1}/{total_comments}... CPS: {cps:.2f} | ETA: {formatted_eta}   "
             sys.stdout.write('\r' + progress_bar)
             sys.stdout.flush()
 
-
     print() 
     all_cleaned_data.append(cleaned_data)
+
+    break
 
 output_dir = os.path.dirname(output_filepath)
 os.makedirs(output_dir, exist_ok=True)
