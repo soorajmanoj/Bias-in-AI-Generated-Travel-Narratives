@@ -9,6 +9,7 @@ import sys
 
 MODEL_NAME = 'gemini-2.5-flash-lite'
 BATCH_SIZE = 25
+BATCH_DELAY_SECONDS = 2.34
 
 
 try:
@@ -119,6 +120,8 @@ for video_object in data:
         )
         sys.stdout.write('\r' + progress_bar)
         sys.stdout.flush()
+
+        time.sleep(BATCH_DELAY_SECONDS)
 
     print()
 
