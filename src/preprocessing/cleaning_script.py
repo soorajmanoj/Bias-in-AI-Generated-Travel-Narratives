@@ -44,7 +44,6 @@ CUSTOM_VOCABULARY = {
 
 
 def remove_emojis(text):
-    """Removes emoji characters from a string."""
     emoji_pattern = re.compile(
         "["
         "\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF"
@@ -74,7 +73,7 @@ def correct_spelling(text, spell_checker_instance):
 
 
 input_filepath = os.path.join('..', '..', 'data', 'raw', 'youtube_data.json')
-output_filepath = os.path.join('..', '..', 'data', 'clean', 'cleaned_data.json')
+output_filepath = os.path.join('..', '..', 'data', 'clean', 'cleaned_data_noLLM_full.json')
 
 try:
     with open(input_filepath, 'r', encoding='utf-8') as f:
@@ -107,12 +106,8 @@ for video_object in data:
     for comment in video_object.get("comments", []):
         if not isinstance(comment, str) or not comment.strip():
             continue
-
         original_words = set(word.lower() for word in comment.split())
-        
-
         if CUSTOM_VOCABULARY.intersection(original_words):
-
             processed_comment = comment.lower()
             cleaned_comment = remove_emojis(processed_comment)
             cleaned_comment = remove_stopwords(cleaned_comment)
