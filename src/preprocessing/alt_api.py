@@ -10,7 +10,7 @@ import itertools
 
 MODEL_NAME = 'gemini-2.5-flash-lite'
 BATCH_SIZE = 25
-BATCH_DELAY_SECONDS = 60
+BATCH_DELAY_SECONDS = 15
 
 
 try:
@@ -20,9 +20,7 @@ try:
 except Exception as e:
     print(f"Warning: Could not load .env file. Error: {e}")
 
-
 try:
-
     api_keys = [
         key for name, key in os.environ.items() 
         if name.startswith("GOOGLE_API_KEY_") and key.strip()
@@ -31,16 +29,18 @@ try:
     if not api_keys:
         raise ValueError("No environment variables starting with 'GOOGLE_API_KEY_' found.")
     
-    key_cycler = itertools.cycle(api_keys)
+
+    key_cycler = itertools.cycle(enumerate(api_keys, 1))
+    
     print(f"Successfully loaded {len(api_keys)} API key(s).")
     
 
-    genai.configure(api_key=next(key_cycler))
+    genai.configure(api_key=api_keys[0])
     model = genai.GenerativeModel(MODEL_NAME)
     print(f"Configured Gemini API with model '{MODEL_NAME}'.")
     
 except Exception as e:
-    print(f"X Error configuring Gemini client: {e}")
+    print(f"Error configuring Gemini client: {e}")
     exit()
 
 def format_time(seconds):
@@ -78,7 +78,7 @@ def process_comments_in_batch(comments_batch, current_api_key):
         if isinstance(result, list) and len(result) == len(comments_batch):
             return result
         else:
-            print(f"\n Warning: Batch returned a mismatched result. Expected {len(comments_batch)} items, got {len(result) if isinstance(result, list) else 'non-list'}.")
+            print(f"\nWarning: Batch returned a mismatched result. Expected {len(comments_batch)} items, got {len(result) if isinstance(result, list) else 'non-list'}.")
             return None
     except Exception as e:
         print(f"\nAn error occurred during API call: {e}")
@@ -86,17 +86,23 @@ def process_comments_in_batch(comments_batch, current_api_key):
 
 
 input_filepath = os.path.join('..', '..', 'data', 'raw', 'youtube_data.json')
-output_filepath = os.path.join('..', '..', 'data', 'clean', 'API_cleaned_data_final.json')
+output_filepath = os.path.join('..', '..', 'data', 'clean', 'API_cleaned_data_combined.json')
 
 
 try:
     with open(input_filepath, 'r', encoding='utf-8') as f:
         data = json.load(f)
 except FileNotFoundError:
-    print(f"X Error: The file {input_filepath} was not found.")
+    print(f"Error: The file {input_filepath} was not found.")
     exit()
 
-all_cleaned_data = []
+
+all_cleaned_data = {
+    "rom_hindi": [],
+    "english": []
+}
+seen_comments = set()
+
 print(f"Starting data cleaning for the full dataset...")
 overall_start_time = time.time()
 
@@ -122,7 +128,8 @@ for video_object in data:
     for i in range(0, total_comments, BATCH_SIZE):
         batch = comments_to_process[i:i + BATCH_SIZE]
         
-        current_key = next(key_cycler)
+
+        key_index, current_key = next(key_cycler)
         batch_results = process_comments_in_batch(batch, current_key)
         
         if batch_results:
@@ -135,8 +142,10 @@ for video_object in data:
         cps = comments_processed / elapsed_time if elapsed_time > 0 else 0
         eta_seconds = ((elapsed_time / comments_processed) * (total_comments - comments_processed)) if cps > 0 else 0
         
+
         progress_bar = (
             f"  - Progress: {comments_processed}/{total_comments} | "
+            f"Key: {key_index}/{len(api_keys)} | "
             f"CPS: {cps:.2f} | "
             f"ETA: {format_time(eta_seconds)}    "
         )
@@ -146,25 +155,20 @@ for video_object in data:
         if (i + BATCH_SIZE) < total_comments:
             time.sleep(BATCH_DELAY_SECONDS)
 
-    print() 
+    print()
 
 
-    cleaned_data = {
-        "rom_hindi": [],
-        "english": []
-    }
-    
+    comments_added_this_video = 0
     for result in final_results_for_video:
         category = result.get("classification")
-        cleaned_text = result.get("cleaned_text", "")
+        cleaned_text = result.get("cleaned_text", "").strip()
         
-        if category in cleaned_data:
-            cleaned_data[category].append(cleaned_text)
-
-    if cleaned_data["rom_hindi"] or cleaned_data["english"]:
-        all_cleaned_data.append(cleaned_data)
-    else:
-        print("  - No 'rom_hindi' or 'english' comments found after processing.")
+        if cleaned_text and category in all_cleaned_data and cleaned_text not in seen_comments:
+            all_cleaned_data[category].append(cleaned_text)
+            seen_comments.add(cleaned_text)
+            comments_added_this_video += 1
+    
+    print(f"  - Added {comments_added_this_video} new unique comments from this video.")
 
 
 total_duration = time.time() - overall_start_time
@@ -172,7 +176,10 @@ print(f"\nTotal time taken: {format_time(total_duration)}")
 
 output_dir = os.path.dirname(output_filepath)
 os.makedirs(output_dir, exist_ok=True)
+
+
 with open(output_filepath, 'w', encoding='utf-8') as f:
     json.dump(all_cleaned_data, f, indent=4, ensure_ascii=False)
 
-print(f" Successfully processed {video_count} video(s) and saved the result.")
+print(f"Successfully processed {video_count} video(s) and saved the combined result.")
+print(f"Final counts: {len(all_cleaned_data['rom_hindi'])} rom_hindi, {len(all_cleaned_data['english'])} english.")
