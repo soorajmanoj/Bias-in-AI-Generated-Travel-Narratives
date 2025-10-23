@@ -125,4 +125,4 @@ os.makedirs(output_dir, exist_ok=True)
 with open(output_filepath, 'w', encoding='utf-8') as f:
     json.dump(all_cleaned_data, f, indent=4, ensure_ascii=False)
 
-print(f"✅ Successfully processed {len(all_cleaned_data)} video(s) and saved the result.")
+print(f" Successfully processed {len(all_cleaned_data)} video(s) and saved the result.")

@@ -4,13 +4,13 @@ import os
 try:
     from spellchecker import SpellChecker
 except ImportError:
-    print("⚠️ Pyspellchecker not found. Spelling correction will be skipped.")
+    print(" Pyspellchecker not found. Spelling correction will be skipped.")
     print("Please run 'pip install pyspellchecker'")
     SpellChecker = None
 try:
     from langdetect import detect, LangDetectException
 except ImportError:
-    print("⚠️ Langdetect not found. Language detection will be skipped.")
+    print(" Langdetect not found. Language detection will be skipped.")
     print("Please run 'pip install langdetect'")
     detect = None
 
@@ -79,13 +79,13 @@ try:
     with open(input_filepath, 'r', encoding='utf-8') as f:
         data = json.load(f)
 except FileNotFoundError:
-    print(f"❌ Error: The file {input_filepath} was not found.")
+    print(f" Error: The file {input_filepath} was not found.")
     exit()
 
 if SpellChecker:
     spell = SpellChecker()
     spell.word_frequency.load_words(CUSTOM_VOCABULARY)
-    print("✅ Spelling corrector initialized with custom vocabulary.")
+    print(" Spelling corrector initialized with custom vocabulary.")
 else:
     spell = None
 
@@ -148,4 +148,4 @@ os.makedirs(output_dir, exist_ok=True)
 with open(output_filepath, 'w', encoding='utf-8') as f:
     json.dump(all_cleaned_data, f, indent=4, ensure_ascii=False)
 
-print(f"✅ Successfully processed {len(all_cleaned_data)} video(s) and saved the result to {output_filepath}")
+print(f" Successfully processed {len(all_cleaned_data)} video(s) and saved the result to {output_filepath}")

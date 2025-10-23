@@ -62,11 +62,11 @@ try:
     with open(input_filepath, 'r', encoding='utf-8') as f:
         data = json.load(f)
 except FileNotFoundError:
-    print(f"❌ Error: The file {input_filepath} was not found.")
+    print(f" Error: The file {input_filepath} was not found.")
     exit()
 
 all_cleaned_data = []
-print(f"🚀 Starting data cleaning process with model '{MODEL_NAME}' ...")
+print(f" Starting data cleaning process with model '{MODEL_NAME}' ...")
 
 for video_object in data[:1]:
     if not isinstance(video_object, dict) or "video_id" not in video_object:
@@ -123,4 +123,4 @@ os.makedirs(output_dir, exist_ok=True)
 with open(output_filepath, 'w', encoding='utf-8') as f:
     json.dump(all_cleaned_data, f, indent=4, ensure_ascii=False)
 
-print(f"✅ Successfully processed {len(all_cleaned_data)} video(s) and saved the result.")
+print(f" Successfully processed {len(all_cleaned_data)} video(s) and saved the result.")
