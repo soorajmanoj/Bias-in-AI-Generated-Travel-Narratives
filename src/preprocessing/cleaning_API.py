@@ -27,7 +27,7 @@ try:
     model = genai.GenerativeModel(MODEL_NAME)
     print(f"✅ Successfully configured Gemini API with model '{MODEL_NAME}'.")
 except Exception as e:
-    print(f" Error configuring Gemini client: {e}")
+    print(f"❌ Error configuring Gemini client: {e}")
     exit()
 
 def format_time(seconds):
@@ -76,7 +76,7 @@ try:
     with open(input_filepath, 'r', encoding='utf-8') as f:
         data = json.load(f)
 except FileNotFoundError:
-    print(f" Error: The file {input_filepath} was not found.")
+    print(f"❌ Error: The file {input_filepath} was not found.")
     exit()
 
 all_cleaned_data = []
