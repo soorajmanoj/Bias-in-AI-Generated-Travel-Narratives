@@ -6,8 +6,8 @@ from tqdm import tqdm
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-DATA_PATH = "src/counterspeech/data/API_cleaned_data_full.json"
-OUT_PATH = "src/counterspeech/data/gemini_responses.json"
+DATA_PATH = "../data/API_cleaned_data_full.json"
+OUT_PATH = "../data/gemini_responses.json"
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 def build_prompt(comment: str) -> str:
@@ -49,4 +49,4 @@ for vid, langs in tqdm(data.items(), desc="Processing Gemini"):
 with open(OUT_PATH, "w") as f:
     json.dump(results, f, ensure_ascii=False, indent=2)
 
-print(f"✅ Saved {len(results)} Gemini responses to {OUT_PATH}")
+print(f" Saved {len(results)} Gemini responses to {OUT_PATH}")
