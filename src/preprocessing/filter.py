@@ -2,47 +2,46 @@ import google.generativeai as genai
 import json
 import os
 import time
+import ijson  # For streaming large JSON
 
 # --- 1. Configuration ---
-
-# PLEASE SET YOUR API KEY
-# Option 1 (Recommended): Set an environment variable named 'GOOGLE_API_KEY'
-# in your terminal: export GOOGLE_API_KEY='Your_Key_Here' (macOS/Linux)
-#                  set GOOGLE_API_KEY='Your_Key_Here' (Windows)
-API_KEY = os.getenv("GOOGLE_API_KEY")
-
-# Option 2: Paste your key here (less secure)
+# Make sure to set your API key in your environment or paste it here.
+API_KEY = "INSERT API KEY HERE"
 if not API_KEY:
-    API_KEY = "AIzaSyATP22cZ1ThXI2A71AHyMs3Svj6XYOLCiQ"
+    # --- TEMPORARY TEST (if needed) ---
+    # API_KEY = "PASTE_YOUR_NEW_API_KEY_HERE"
 
-# if not API_KEY:
-#     raise ValueError("Please set the GOOGLE_API_KEY environment variable or paste your key directly into the script.")
+    if not API_KEY:  # Check again
+        raise ValueError("Please set the GOOGLE_API_KEY environment variable or paste your key directly.")
 
 genai.configure(api_key=API_KEY)
 
 # --- 2. File Configuration ---
-INPUT_FILE = "test/data.json"  # <-- Change this to your file's name if different
-OUTPUT_FILE = "test/classified_comments.json"
+INPUT_FILE = "../../data/clean/final_API_data.json"  # <-- Your huge input JSON
+RELEVANT_OUTPUT_FILE = "../../data/clean/filtered/relevant.jsonl"
+IRRELEVANT_OUTPUT_FILE = "../../data/clean/filtered/irrelevant.jsonl"
+ERROR_OUTPUT_FILE = "../../data/clean/filtered/error.jsonl"  # <-- NEW: File for errors
 
-# Delay between API calls (in seconds) to avoid rate limiting
-RATE_LIMIT_DELAY = 1
+RATE_LIMIT_DELAY = 1  # 1-second delay to be nice to the API
 
-# --- 3. Model Instruction (Copied directly from your prompt) ---
+# --- 3. Updated Model Instruction (from your last prompt) ---
 MODEL_INSTRUCTION = """
-You are analyzing YouTube comments on travel vlogs related to India.
-Your task is to classify each comment as “relevant” or “irrelevant.”
+You are analyzing YouTube comments on travel vlogs related to India for a project on societal biases.
+Your task is to classify each comment as “relevant” or “irrelevant” based on a strict definition.
 
-Definition of relevance:
-A comment is relevant if it discusses, mentions, or implies anything about:
-	•	India or other countries, especially in comparison.
-	•	Culture, society, safety, politics, food, people, tourism, religion, lifestyle, or traditions.
-	•	Any opinions, praise, criticism, or controversy about India or Indian culture.
-	•	Travel experiences, infrastructure, or local interactions in India.
+Definition of Relevance:
+A comment is relevant *only if* it expresses a clear opinion, generalization, or comparison about:
+* Broad Societal Topics: Indian culture, society, safety, politics, religion, traditions, or lifestyle (e.g., "India is so unsafe for women," "Indian culture is very spiritual").
+* Explicit Judgments: Direct praise, criticism, or controversy about India, its people, or its culture as a whole (e.g., "Indians are the friendliest people," "India is a very dirty country").
+* Direct Comparisons: Explicit comparisons between India and other countries (e.g., "It's cleaner here than in Pakistan," "People in Europe are not as welcoming as in India").
+* Generalizations from Travel: Travel experiences that are used to make a broader conclusion about the country or its people (e.g., "I got scammed, this happens all the time in India").
 
+Definition of Irrelevance:
 A comment is irrelevant if it:
-	•	Only contains emojis, tags, links, timestamps, or random text.
-	•	Talks about the creator, music, editing, or unrelated topics.
-	•	Is spam, promotional, or completely off-topic.
+* Is a Personal Anecdote: Describes a simple, personal interaction or a specific event *without* making a broader judgment (e.g., "The lady on the street gave me an apple," "Our guide was very nice").
+* Is a Simple Observation: Makes a neutral observation about food, prices, or scenery (e.g., "That food looks delicious," "The mountains are beautiful," "The train was late").
+* Focuses on the Creator: Talks about the vlogger, their music, editing, or unrelated topics (e.g., "Love your videos!", "What camera do you use?").
+* Is Generic: Contains only emojis, tags, links, timestamps, spam, promotions, or random text.
 
 Output format:
 Return results as JSON with two fields:
@@ -54,102 +53,134 @@ Return results as JSON with two fields:
 """
 
 # --- 4. Setup Gemini Model ---
-# We configure the model to *only* output JSON.
 model = genai.GenerativeModel('gemini-2.5-flash-lite')
 generation_config = genai.GenerationConfig(response_mime_type="application/json")
 
 
-# --- 5. Helper Function for Classification ---
+# --- 5. Helper Function for Classification (with the list/dict fix) ---
 def classify_comment(comment_text):
     """
     Sends a single comment to the Gemini API for classification.
+    Returns the classification string ("relevant", "irrelevant", or "ERROR")
     """
-    # Create the full prompt to send to the API
-    prompt_for_api = f"""{MODEL_INSTRUCTION}
-
----
-Please classify the following comment:
-"{comment_text}"
-"""
+    prompt_for_api = f"{MODEL_INSTRUCTION}\n\n---\nPlease classify the following comment:\n\"{comment_text}\""
 
     try:
         response = model.generate_content(
             prompt_for_api,
             generation_config=generation_config
         )
-        # The response text is a JSON string, so we parse it into a Python dict
-        result = json.loads(response.text)
-        return result
+        result_data = json.loads(response.text)
+
+        classification_dict = None
+
+        if isinstance(result_data, list):
+            if len(result_data) > 0:
+                classification_dict = result_data[0]
+            else:
+                print(f"--- API returned an empty list for comment: {comment_text[:50]}...")
+                return "ERROR"
+
+        elif isinstance(result_data, dict):
+            classification_dict = result_data
+
+        else:
+            print(f"--- API returned unexpected format for comment: {comment_text[:50]}...")
+            return "ERROR"
+
+        return classification_dict.get("classification", "ERROR").lower()
 
     except Exception as e:
+        # This will catch API key errors, JSON parsing errors, etc.
         print(f"--- ERROR classifying comment: {comment_text[:50]}...")
         print(f"--- Error details: {e}")
-        # Return a consistent error format if the API fails
-        return {
-            "comment": comment_text,
-            "classification": "ERROR"
-        }
+        return "ERROR"
 
 
-# --- 6. Main Script Logic ---
-def main():
-    print(f"Loading comments from {INPUT_FILE}...")
-
-    # Load the input JSON file
+# --- 6. Helper Function for Efficient Writing ---
+def append_to_jsonl(filename, comment, language):
+    """
+    Appends a new line to a .jsonl file.
+    Each line is a self-contained JSON object.
+    """
+    output_data = {
+        "comment": comment,
+        "language": language
+    }
     try:
-        with open(INPUT_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        with open(filename, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(output_data, ensure_ascii=False) + "\n")
+
+    except IOError as e:
+        print(f"--- ERROR writing to {filename}: {e}")
+
+
+# --- 7. Main Streaming Logic ---
+def process_comments(language_key):
+    """
+    Streams comments for a specific key (e.g., 'rom_hindi')
+    from the input file, classifies, and writes to output .jsonl files.
+    """
+    print(f"\n--- Starting processing for: {language_key} ---")
+    total_count = 0
+    relevant_count = 0
+    irrelevant_count = 0
+    error_count = 0
+
+    try:
+        with open(INPUT_FILE, 'rb') as f:  # Open in binary mode for ijson
+            comments_stream = ijson.items(f, f'{language_key}.item')
+
+            for comment in comments_stream:
+                total_count += 1
+
+                if not isinstance(comment, str) or not comment.strip():
+                    print(f"Skipping empty/invalid comment #{total_count}")
+                    append_to_jsonl(IRRELEVANT_OUTPUT_FILE, str(comment), language_key)
+                    irrelevant_count += 1
+                    continue
+
+                print(f"Processing {language_key} comment {total_count}: {comment[:60]}...")
+
+                classification = classify_comment(comment)
+
+                if classification == "relevant":
+                    append_to_jsonl(RELEVANT_OUTPUT_FILE, comment, language_key)
+                    relevant_count += 1
+                elif classification == "irrelevant":
+                    append_to_jsonl(IRRELEVANT_OUTPUT_FILE, comment, language_key)
+                    irrelevant_count += 1
+                else:
+                    # --- THIS IS THE CHANGE ---
+                    # classification == "ERROR"
+                    # Log this comment to the error file for review/retry later
+                    append_to_jsonl(ERROR_OUTPUT_FILE, comment, language_key)
+                    error_count += 1
+
+                time.sleep(RATE_LIMIT_DELAY)
+
+    except ijson.JSONError as e:
+        print(f"Error parsing JSON from {INPUT_FILE}. Is it valid? Error: {e}")
     except FileNotFoundError:
         print(f"Error: Input file not found at {INPUT_FILE}")
-        return
-    except json.JSONDecodeError:
-        print(f"Error: Could not decode JSON from {INPUT_FILE}. Please check the file format.")
-        return
 
-    # Combine all comments into a single list
-    rom_hindi_comments = data.get("rom_hindi", [])
-    english_comments = data.get("english", [])
-    all_comments = rom_hindi_comments + english_comments
-
-    if not all_comments:
-        print("No comments found in the input file.")
-        return
-
-    print(f"Found {len(all_comments)} total comments to process.")
-
-    all_results = []
-
-    # Process each comment one by one
-    for i, comment in enumerate(all_comments):
-        print(f"Processing comment {i + 1}/{len(all_comments)}: {comment[:60]}...")
-
-        # Skip empty or invalid comments
-        if not isinstance(comment, str) or not comment.strip():
-            print("Skipping empty or invalid comment.")
-            all_results.append({
-                "comment": str(comment),
-                "classification": "irrelevant"  # Treat empty/invalid as irrelevant
-            })
-            continue
-
-        result_data = classify_comment(comment)
-        all_results.append(result_data)
-
-        # Be nice to the API and respect rate limits
-        time.sleep(RATE_LIMIT_DELAY)
-
-    # Save all results to the output file
-    print(f"\nProcessing complete. Saving results to {OUTPUT_FILE}...")
-    try:
-        with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
-            # indent=2 makes the JSON human-readable
-            # ensure_ascii=False correctly saves non-English characters
-            json.dump(all_results, f, indent=2, ensure_ascii=False)
-        print("Successfully saved results.")
-    except IOError as e:
-        print(f"Error saving output file: {e}")
+    print(f"\n--- Finished processing for: {language_key} ---")
+    print(f"Total: {total_count}, Relevant: {relevant_count}, Irrelevant: {irrelevant_count}, Errors: {error_count}")
 
 
-# Run the script
+# --- 8. Run the Script ---
+def main():
+    # Clear output files at the start of the run
+    open(RELEVANT_OUTPUT_FILE, 'w').close()
+    open(IRRELEVANT_OUTPUT_FILE, 'w').close()
+    open(ERROR_OUTPUT_FILE, 'w').close()  # <-- NEW: Clear the error file too
+    print("Cleared all output files.")
+
+    process_comments('rom_hindi')
+    process_comments('english')
+
+    print("\n--- All processing complete! ---")
+
+
 if __name__ == "__main__":
     main()
