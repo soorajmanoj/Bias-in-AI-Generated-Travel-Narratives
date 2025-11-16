@@ -1,120 +1,107 @@
 import json
-import os
-from transformers import AutoTokenizer, AutoModelForCausalLM
+import time
 import torch
 from tqdm import tqdm
-
-# ============================================================
-# 1. Model Setup
-# ============================================================
-
-MODEL_PATH = (
-    "/Users/akken/Desktop/Projects_nodel/"
-    "Bias-in-AI-Generated-Travel-Narratives/src/"
-    "counterspeech/models/models_cache/romansetu-cpt-roman-sft-roman"
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig
 )
 
-print(f"🔹 Loading local model from: {MODEL_PATH}")
+MODEL_NAME = "sarvamai/Airavata-LLM-SFT-v2-7B"
 
-# --- Auto-detect device ---
-if torch.cuda.is_available():
-    device = "cuda"
-elif torch.backends.mps.is_available():
-    device = "mps"
-else:
-    device = "cpu"
+print("🔥 Loading Airavata 7B in 4-bit mode (English-only counterspeech)…")
 
-print(f"🧠 Using device: {device.upper()}")
+# ---------------------------
+# Quantization config (macOS)
+# ---------------------------
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.float16,
+    bnb_4bit_quant_type="nf4"
+)
 
-# --- Load tokenizer and model ---
-tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
 
-# half precision for MPS; else float32
-dtype = torch.float16 if device == "mps" else torch.float32
+device = "mps" if torch.backends.mps.is_available() else "cpu"
 
 model = AutoModelForCausalLM.from_pretrained(
-    MODEL_PATH,
-    torch_dtype=dtype,
-    device_map=None
+    MODEL_NAME,
+    quantization_config=bnb_config,
+    device_map=device,
+    torch_dtype=torch.float16,
+    trust_remote_code=True
 )
-model.to(device)
-model.eval()
 
-print(f"✅ Model loaded successfully on {device.upper()}.\n")
+SYSTEM_PROMPT = """
+You are an Indian counterspeech assistant.
 
-# ============================================================
-# 2. Generation Function
-# ============================================================
+Your job is to write calm, respectful, and empathetic replies
+ONLY in English, regardless of the language of the input comment.
 
-def generate_counterspeech(comment: str) -> str:
-    """Generate a kind, respectful counterspeech reply for a given comment."""
-    prompt = (
-        f"Generate a kind and respectful counterspeech reply for the following comment:\n"
-        f"{comment}\n\nReply:"
-    )
+Rules:
+- Do NOT use Hindi, Hinglish, or Roman Hindi words in your reply.
+- Keep replies short (1–2 sentences).
+- Do not insult the user.
+- Focus on reducing tension, promoting understanding, and being polite.
+- Use simple English that feels natural and human.
+"""
+
+def build_prompt(comment):
+    return f"{SYSTEM_PROMPT}\n\nUser comment: {comment}\nAssistant reply (English only):"
+
+def generate_counterspeech(text: str) -> str:
+    prompt = build_prompt(text)
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
-    output = model.generate(
-        **inputs,
-        max_new_tokens=30,
-        do_sample=False,  # Greedy decoding
-        pad_token_id=tokenizer.eos_token_id
-    )
 
-    text = tokenizer.decode(output[0], skip_special_tokens=True)
-    if "Reply:" in text:
-        text = text.split("Reply:")[-1].strip()
-    return text
+    with torch.no_grad():
+        output = model.generate(
+            **inputs,
+            max_new_tokens=70,
+            temperature=0.7,
+            top_p=0.9,
+            do_sample=True
+        )
 
-# ============================================================
-# 3. Load Dataset
-# ============================================================
+    reply = tokenizer.decode(output[0], skip_special_tokens=True)
 
-INPUT_FILE = "../data/API_cleaned_data_full.json"
-OUTPUT_FILE = "counterspeech_output.json"
+    # Remove echoes of the prompt if model repeats it
+    if "Assistant reply" in reply:
+        reply = reply.split("Assistant reply (English only):")[-1].strip()
 
-print(f"📂 Loading dataset from {INPUT_FILE}")
-with open(INPUT_FILE, "r", encoding="utf-8") as f:
-    data = json.load(f)[0]
+    return reply
 
-results = {"english": [], "rom_hindi": []}
+def main():
+    input_file = "../data/API_cleaned_data_full.json"
+    output_file = "../outputs/airavata_english_counterspeech.json"
 
-# ============================================================
-# 4. Process Comments
-# ============================================================
+    with open(input_file, "r") as f:
+        records = json.load(f)
 
-def process_comments(lang_key: str):
-    comments = data[lang_key]
-    print(f"\n🗣️ Generating counterspeech for {lang_key} comments ({len(comments)} total)...")
+    all_results = []
 
-    for i, comment in enumerate(tqdm(comments, desc=f"{lang_key}")):
-        try:
-            print(f"🕒 Generating for: {comment[:60]}...")
-            counterspeech = generate_counterspeech(comment)
-            print(f"✅ Done → {counterspeech[:80]}...")
-        except Exception as e:
-            print(f"⚠️ Error generating for comment {i}: {e}")
-            counterspeech = "Generation failed."
+    for record in records:
+        video_id = record["video_id"]
+        comments = record["rom_hindi"] + record["english"] + record["other"]
 
-        results[lang_key].append({
-            "comment": comment,
-            "counterspeech": counterspeech
-        })
+        for c in tqdm(comments, desc=f"Processing {video_id}"):
+            try:
+                reply = generate_counterspeech(c)
+            except Exception as e:
+                reply = f"[ERROR] {e}"
 
-        # Intermediate checkpoint every 5 comments
-        if (i + 1) % 5 == 0:
-            with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-                json.dump(results, f, indent=4, ensure_ascii=False)
-            print(f"💾 Progress saved after {i+1} {lang_key} comments.")
+            all_results.append({
+                "video_id": video_id,
+                "comment": c,
+                "counterspeech_english": reply
+            })
 
-# Run both sets
-process_comments("english")
-process_comments("rom_hindi")
+            time.sleep(0.05)
 
-# ============================================================
-# 5. Save Final Results
-# ============================================================
+    with open(output_file, "w") as f:
+        json.dump(all_results, f, indent=2, ensure_ascii=False)
 
-with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-    json.dump(results, f, indent=4, ensure_ascii=False)
+    print("✅ DONE — saved to", output_file)
 
-print(f"\n✅ All counterspeech replies generated and saved to {OUTPUT_FILE}")
+if __name__ == "__main__":
+    main()
