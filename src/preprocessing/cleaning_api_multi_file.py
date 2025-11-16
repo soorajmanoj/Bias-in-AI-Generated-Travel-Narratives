@@ -161,7 +161,7 @@ def main(argv=None):
 
     # File Locations
     parts_glob = args.parts_glob or str(repo_root / "Bias-in-AI-Generated-Travel-Narratives" / 'data' / 'raw' / 'youtube_data_part_*.json')
-    output_path = Path(args.output) if args.output else repo_root / "Bias-in-AI-Generated-Travel-Narratives" / 'data' / 'clean' / 'Final_api_data.json'
+    output_path = Path(args.output) if args.output else repo_root / "Bias-in-AI-Generated-Travel-Narratives" / 'data' / 'clean' / 'final_API_data.json'
     progress_path = Path(args.progress_file) if args.progress_file else repo_root / "Bias-in-AI-Generated-Travel-Narratives" / 'data' / 'clean' / 'processing_progress.json'
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
