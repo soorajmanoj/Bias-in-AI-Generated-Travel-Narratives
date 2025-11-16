@@ -2,7 +2,7 @@ from googleapiclient.discovery import build
 import json
 import os
 from dotenv import load_dotenv
-import csv  # Added for CSV file reading
+import csv 
 
 
 def get_youtube_service(api_key: str):
@@ -48,7 +48,7 @@ def get_video_comments(youtube, video_id, max_comments=10000):
         request = youtube.commentThreads().list(
             part="snippet",
             videoId=video_id,
-            maxResults=min(max_comments, 100),  # API limit per request is 100
+            maxResults=min(max_comments, 100),
             textFormat="plainText",
         )
 
@@ -59,29 +59,27 @@ def get_video_comments(youtube, video_id, max_comments=10000):
                 comments.append(comment)
                 if len(comments) >= max_comments:
                     break
-            # Check for a nextPageToken to continue pagination
+            
             if 'nextPageToken' in response:
                 request = youtube.commentThreads().list_next(request, response)
             else:
-                break  # No more pages
+                break 
     except Exception as e:
         print(f"An error occurred while fetching comments for {video_id}: {e}")
 
     return comments
 
 
-# Load environment variables from the .env file
+
 load_dotenv()
 
-# Retrieve configuration values from environment variables or use default values
 API_KEY = os.getenv("YOUTUBE_API_KEY")
 
-# --- CONFIGURATION UPDATED ---
-# Paths
-VIDEO_ID_FILE = "../util/video_ids.csv"  # Changed to read from .csv
+
+VIDEO_ID_FILE = "../util/video_ids.csv"
 OUTPUT_DIR = "../../data/raw"
-OUTPUT_FILE = os.path.join(OUTPUT_DIR, "youtube_data.json")  # Single output file
-MAX_COMMENTS = 10000  # Updated to 10,000
+OUTPUT_FILE = os.path.join(OUTPUT_DIR, "youtube_data.json")  
+MAX_COMMENTS = 10000
 
 
 def main():
@@ -96,53 +94,66 @@ def main():
 
     @return None
     """
-    # Ensure that the API key is set
-    if not API_KEY:
-        raise ValueError("❌ API Key not found. Please set YOUTUBE_API_KEY in your .env file.")
 
-    # Initialize YouTube API client
+    if not API_KEY:
+        raise ValueError("API Key not found. Please set YOUTUBE_API_KEY in your .env file.")
+
     youtube = get_youtube_service(API_KEY)
 
-    # Ensure output directory exists
+
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # This list will store all the data before writing to a single file
     all_videos_data = []
+    existing_ids = set()
+    if os.path.exists(OUTPUT_FILE):
+        try:
+            with open(OUTPUT_FILE, 'r', encoding='utf-8') as ef:
+                existing = json.load(ef)
+                if isinstance(existing, list):
+                    all_videos_data = existing
+                    for v in existing:
+                        if isinstance(v, dict) and 'video_id' in v:
+                            existing_ids.add(v['video_id'])
+        except Exception as e:
+            print(f"Warning: could not read existing output {OUTPUT_FILE}: {e}")
 
-    # Read video IDs and types from the input CSV file
     try:
         with open(VIDEO_ID_FILE, "r", newline="", encoding="utf-8") as f:
             reader = csv.reader(f)
-            header = next(reader)  # Skip the header row ('video_id,type')
+            header = next(reader)
 
-            # Process each row in the CSV
             for row in reader:
                 video_id, video_type = row
-                print(f"Processing Video ID: {video_id} (Type: {video_type})")
-
-                # Fetch the video title
-                title = get_video_details(youtube, video_id)
-                if not title:
-                    print(f"⚠️  Could not find title for video ID: {video_id}. Skipping.")
+                if video_id in existing_ids:
+                    print(f"Skipping Video ID: {video_id} (already present in {OUTPUT_FILE})")
                     continue
 
-                # Fetch the top comments (up to MAX_COMMENTS)
+                print(f"Processing Video ID: {video_id} (Type: {video_type})")
+
+                
+                title = get_video_details(youtube, video_id)
+                if not title:
+                    print(f" Could not find title for video ID: {video_id}. Skipping.")
+                    continue
+
+                
                 comments = get_video_comments(youtube, video_id, MAX_COMMENTS)
 
-                # Structure the data as requested
+               
                 video_data = {
                     "video_id": video_id,
-                    "type": video_type,  # Added 'type' from the CSV
+                    "type": video_type,
                     "title": title,
                     "comments": comments
                 }
 
-                # Add this video's data to our master list
+                
                 all_videos_data.append(video_data)
-                print(f"✅ Collected {len(comments)} comments for {video_id}.")
+                existing_ids.add(video_id)
+                print(f"Collected {len(comments)} comments for {video_id}.")
 
     except FileNotFoundError:
-        print(f"❌ Error: The file {VIDEO_ID_FILE} was not found.")
+        print(f"Error: The file {VIDEO_ID_FILE} was not found.")
         return
 
     # Save the aggregated data to a single JSON file after the loop
