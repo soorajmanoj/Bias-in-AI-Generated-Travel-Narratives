@@ -1,85 +1,117 @@
 import json
-from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
-from tqdm import tqdm
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
-# ---------- CONFIG ----------
-MODEL_NAME = "meta-llama/Llama-3.2-1B-Instruct"
-INPUT_FILE = "../data/API_cleaned_data_full.json"
-OUTPUT_FILE = "../outputs/counterspeech_output_llama32.json"
-DEVICE = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+# ----------------------------------------
+# LOAD MODEL (Llama-3.2-1B-Instruct, MPS)
+# ----------------------------------------
+print("🔹 Loading meta-llama/Llama-3.2-1B-Instruct on mps...")
 
-# ---------- LOAD MODEL ----------
-print(f"🔹 Loading {MODEL_NAME} on {DEVICE}...")
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModelForCausalLM.from_pretrained(
-    MODEL_NAME,
-    torch_dtype=torch.float16 if DEVICE == "cuda" else torch.float32,
-    device_map="auto"
+device = "mps" if torch.backends.mps.is_available() else "cpu"
+
+tokenizer = AutoTokenizer.from_pretrained(
+    "meta-llama/Llama-3.2-1B-Instruct",
+    trust_remote_code=True
 )
-print(" Model loaded successfully!")
 
-# ---------- LOAD INPUT DATA ----------
-with open(INPUT_FILE, "r", encoding="utf-8") as f:
+model = AutoModelForCausalLM.from_pretrained(
+    "meta-llama/Llama-3.2-1B-Instruct",
+    torch_dtype=torch.float16,
+    device_map=device,
+    trust_remote_code=True
+)
+
+print("✨ Model loaded successfully!")
+
+
+# ----------------------------------------
+# LOAD YOUR MERGED JSON FILE
+# ----------------------------------------
+INPUT_FILE = "../../../data/clean/filtered/merged_output.json"
+
+with open(INPUT_FILE, "r") as f:
     data = json.load(f)
 
-english_comments = data[0].get("english", [])
-rom_hindi_comments = data[0].get("rom_hindi", [])
+rom_hindi_comments = data.get("rom_hindi", [])
+english_comments = data.get("english", [])
 
-# ---------- DEFINE PROMPT ----------
-def build_prompt(comment, lang):
-    if lang == "english":
-        return f"""You are a youtube assistant
-Respond to the following English comment with a relevant reply.
+print(f"📌 Loaded {len(rom_hindi_comments)} Roman Hindi comments")
+print(f"📌 Loaded {len(english_comments)} English comments")
 
-Comment: "{comment}"
-Counterspeech:"""
-    else:
-        return f"""You are a youtube assistant.
-The following comment is written in Romanized Hindi. Respond in **English** with a relevant reply.
-Comment (Romanized Hindi): "{comment}"
-Counterspeech:"""
 
-# ---------- GENERATION FUNCTION ----------
-def generate_counterspeech(comment, lang):
-    prompt = build_prompt(comment, lang)
-    inputs = tokenizer(prompt, return_tensors="pt").to(DEVICE)
+# ----------------------------------------
+# COUNTERSPEECH PROMPT (ENGLISH ONLY)
+# ----------------------------------------
+SYSTEM_PROMPT = """
+You are a counterspeech assistant.
+
+Your job is to reply **only in English**, even when the input comment
+is in Romanized Hindi or Hinglish.
+
+Guidelines:
+- 1–2 sentence reply
+- Natural, simple English
+- Avoid jargon or complex vocabulary
+"""
+
+def build_prompt(comment):
+    return f"{SYSTEM_PROMPT}\nUser: {comment}\nAssistant:"
+
+
+# ----------------------------------------
+# GENERATION FUNCTION
+# ----------------------------------------
+def generate_counterspeech(comment: str) -> str:
+    prompt = build_prompt(comment)
+
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
 
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_new_tokens=128,
+            max_new_tokens=60,
             temperature=0.7,
             top_p=0.9,
             do_sample=True
         )
-    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    # Extract model output text after "Counterspeech:"
-    if "Counterspeech:" in response:
-        return response.split("Counterspeech:")[-1].strip()
-    return response.strip()
 
-# ---------- PROCESS ----------
-output_data = {"english": [], "rom_hindi": []}
+    text = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-print(" Generating counterspeech for English comments...")
-for comment in tqdm(english_comments, desc="English"):
-    try:
-        counterspeech = generate_counterspeech(comment, "english")
-        output_data["english"].append({"comment": comment, "counterspeech": counterspeech})
-    except Exception as e:
-        print(f" Error on English comment: {e}")
+    # Remove prompt echo if present
+    if "Assistant:" in text:
+        text = text.split("Assistant:")[-1].strip()
 
-print(" Generating counterspeech for Romanized Hindi comments (responses in English)...")
-for comment in tqdm(rom_hindi_comments, desc="Romanized Hindi"):
-    try:
-        counterspeech = generate_counterspeech(comment, "rom_hindi")
-        output_data["rom_hindi"].append({"comment": comment, "counterspeech": counterspeech})
-    except Exception as e:
-        print(f" Error on Romanized Hindi comment: {e}")
+    return text
 
-# ---------- SAVE OUTPUT ----------
-with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-    json.dump(output_data, f, ensure_ascii=False, indent=4)
 
-print(f" Counterspeech generation complete! Saved to {OUTPUT_FILE}")
+# ----------------------------------------
+# PROCESS ALL COMMENTS
+# ----------------------------------------
+output = []
+
+all_comments = (
+    [(c, "rom_hindi") for c in rom_hindi_comments] +
+    [(c, "english") for c in english_comments]
+)
+
+print(f"📝 Generating counterspeech for {len(all_comments)} total comments...")
+
+for comment, lang in all_comments:
+    reply = generate_counterspeech(comment)
+    output.append({
+        "comment": comment,
+        "language": lang,
+        "counterspeech_english": reply
+    })
+
+
+# ----------------------------------------
+# SAVE OUTPUT
+# ----------------------------------------
+OUTPUT_FILE = "../outputs/llama32_counterspeech_output.json"
+
+with open(OUTPUT_FILE, "w") as f:
+    json.dump(output, f, indent=2, ensure_ascii=False)
+
+print("✅ Finished!")
+print(f"💾 Saved to {OUTPUT_FILE}")

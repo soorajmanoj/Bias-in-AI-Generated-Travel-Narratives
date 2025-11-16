@@ -2,7 +2,7 @@ import json, os
 from tqdm import tqdm
 from models.llama_client import get_gpt4_response
 from models.gemini_client import get_gemini_response
-from models.indicbert_client import get_indic_response
+from models.model_download_client import get_indic_response
 
 DATA_PATH = "data/API_cleaned_data_full.json"
 OUTPUT_DIR = "outputs"
