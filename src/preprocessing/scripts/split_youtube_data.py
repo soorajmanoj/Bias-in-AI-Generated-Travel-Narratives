@@ -5,13 +5,14 @@ import sys
 
 CHUNK_SIZE = 3
 
-root = Path(__file__).resolve().parent.parent
+root = Path(__file__).resolve().parent.parent.parent.parent
 input_path = root / 'data' / 'raw' / 'youtube_data.json'
 output_dir = root / 'data' / 'raw'
 
 if not input_path.exists():
     print(f"Input file not found: {input_path}")
     sys.exit(1)
+
 
 with input_path.open('r', encoding='utf-8') as f:
     data = json.load(f)
