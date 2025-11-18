@@ -1,19 +1,20 @@
 import google.generativeai as genai
 import json
 import os
+from dotenv import load_dotenv
 import time
 import ijson  # For streaming large JSON
 
+load_dotenv()
+
 # --- 1. Configuration ---
 # Make sure to set your API key in your environment or paste it here.
-API_KEY = "INSERT API KEY HERE"
-if not API_KEY:
-    # --- TEMPORARY TEST (if needed) ---
-    # API_KEY = "PASTE_YOUR_NEW_API_KEY_HERE"
-
-    if not API_KEY:  # Check again
-        raise ValueError("Please set the GOOGLE_API_KEY environment variable or paste your key directly.")
-
+API_KEY = os.getenv("GOOGLE_API_KEY_8")
+if API_KEY:
+    print("API Key loaded successfully.")
+    # You can now use the API_KEY variable in your application
+else:
+    print("Error: API_KEY not found in environment variables.")
 genai.configure(api_key=API_KEY)
 
 # --- 2. File Configuration ---
@@ -22,7 +23,7 @@ RELEVANT_OUTPUT_FILE = "../../data/clean/filtered/relevant.jsonl"
 IRRELEVANT_OUTPUT_FILE = "../../data/clean/filtered/irrelevant.jsonl"
 ERROR_OUTPUT_FILE = "../../data/clean/filtered/error.jsonl"  # <-- NEW: File for errors
 
-RATE_LIMIT_DELAY = 1  # 1-second delay to be nice to the API
+RATE_LIMIT_DELAY = 0.2  # 1-second delay to be nice to the API
 
 # --- 3. Updated Model Instruction (from your last prompt) ---
 MODEL_INSTRUCTION = """

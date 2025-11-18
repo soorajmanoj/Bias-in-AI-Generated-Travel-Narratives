@@ -20,6 +20,7 @@ MODEL_NAME = 'gemini-2.5-flash-lite'
 DEFAULT_BATCH_SIZE = 25
 DEFAULT_BATCH_DELAY_SECONDS = 15
 RETRY_ATTEMPTS = 2
+SKIPPED_BATCHES_FILE = "skipped_batches.json"
 
 
 def load_env(root: Path):
@@ -32,6 +33,35 @@ def load_env(root: Path):
             load_dotenv()
     except Exception as e:
         logging.warning(f"Could not load .env: {e}")
+
+
+def save_skipped_batch(file_path: Path, part_file: str, video_index: int, batch_index: int, comments):
+    """Append skipped batch info to skipped_batches.json for later reprocessing."""
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    data = []
+
+    if file_path.exists():
+        try:
+            with file_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = []
+
+    entry = {
+        "part_file": part_file,
+        "video_index": video_index,
+        "batch_index": batch_index,
+        "comments": comments,
+        "timestamp": int(time.time())
+    }
+
+    data.append(entry)
+
+    with file_path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    logging.warning(f"Saved skipped batch {batch_index} from video {video_index} in file {part_file}")
+
 
 
 def discover_api_keys():
@@ -150,7 +180,7 @@ def main(argv=None):
     parser.add_argument('--start-index', type=int, default=1,
                         help='1-based index of part file to start from')
     parser.add_argument('--start-file', default=None, help='explicit filename to start from (overrides start-index)')
-    parser.add_argument('--output', default=None, help='output file path (defaults to data/clean/Final_api_data.json)')
+    parser.add_argument('--output', default=None, help='output file path (defaults to data/clean/final_API_data.json)')
     parser.add_argument('--progress-file', default=None, help='progress file storing last processed file')
     parser.add_argument('--batch-size', type=int, default=DEFAULT_BATCH_SIZE)
     parser.add_argument('--delay', type=int, default=DEFAULT_BATCH_DELAY_SECONDS)
@@ -242,7 +272,17 @@ def main(argv=None):
                 if batch_results:
                     video_results.extend(batch_results)
                 else:
-                    logging.warning(f"Skipping batch {i//args.batch_size + 1} of video due to API failure.")
+                    batch_number = i // args.batch_size + 1
+                    logging.warning(f"Skipping batch {batch_number} of video due to API failure.")
+
+                    # SAVE THE SKIPPED BATCH
+                    save_skipped_batch(
+                        file_path=repo_root / "Bias-in-AI-Generated-Travel-Narratives" / "data" / "clean" / SKIPPED_BATCHES_FILE,
+                        part_file=str(part),
+                        video_index=videos.index(video),
+                        batch_index=batch_number,
+                        comments=batch
+                    )
 
                 processed = min(i + args.batch_size, total_comments)
                 elapsed = time.time() - start_time
