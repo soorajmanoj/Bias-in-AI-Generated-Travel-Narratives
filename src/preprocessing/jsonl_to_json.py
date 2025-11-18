@@ -6,7 +6,7 @@ output_file = "../../data/clean/filtered/merged_output.json"
 rom_hindi_list = []
 english_list = []
 
-with open(input_file, "r") as f:
+with open(input_file, "r", encoding="utf-8") as f:
     for line in f:
         line = line.strip()
         if not line:
@@ -32,7 +32,7 @@ final_output = {
     "english": english_list
 }
 
-with open(output_file, "w") as f:
+with open(output_file, "w", encoding="utf-8") as f:
     json.dump(final_output, f, indent=2, ensure_ascii=False)
 
 print("✅ Done! Saved to", output_file)
