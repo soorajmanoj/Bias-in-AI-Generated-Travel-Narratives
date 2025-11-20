@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from tqdm import tqdm
 
 load_dotenv()
-PERSPECTIVE_API_KEY = "AIzaSyBGdhhhKIV-IikBiWxB9Ksay2mRFzbJBYA"
+PERSPECTIVE_API_KEY = os.getenv("PERSPECTIVE_API_KEY")
 
 if not PERSPECTIVE_API_KEY:
     raise ValueError("PERSPECTIVE_API_KEY not found in .env")
