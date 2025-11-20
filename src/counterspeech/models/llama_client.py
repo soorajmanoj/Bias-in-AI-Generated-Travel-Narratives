@@ -27,7 +27,7 @@ print("✨ Model loaded successfully!")
 # ----------------------------------------
 # LOAD YOUR MERGED JSON FILE
 # ----------------------------------------
-INPUT_FILE = "../../../data/clean/filtered/merged_output.json"
+INPUT_FILE = "../data/API_cleaned_data_full.json"
 
 with open(INPUT_FILE, "r") as f:
     data = json.load(f)
@@ -108,7 +108,7 @@ for comment, lang in all_comments:
 # ----------------------------------------
 # SAVE OUTPUT
 # ----------------------------------------
-OUTPUT_FILE = "../outputs/llama32_counterspeech_output.json"
+OUTPUT_FILE = "../outputs/llama32_counterspeech_output_final.json"
 
 with open(OUTPUT_FILE, "w") as f:
     json.dump(output, f, indent=2, ensure_ascii=False)
