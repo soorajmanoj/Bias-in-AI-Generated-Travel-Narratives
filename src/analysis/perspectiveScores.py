@@ -53,12 +53,12 @@ def score_comment(comment):
             return scores
 
         elif resp.status_code == 429:
-            print("⛔ Rate limit exceeded — waiting 10 seconds...")
+            print(" Rate limit exceeded — waiting 10 seconds...")
             time.sleep(10)
             continue  # retry
 
         else:
-            print(f"❌ API ERROR {resp.status_code}: {resp.text}")
+            print(f" API ERROR {resp.status_code}: {resp.text}")
             return {a: None for a in ATTRS}
 
 
@@ -66,7 +66,7 @@ def main():
     input_file = "../counterspeech/outputs/llama32_counterspeech_output_final.json"
     output_file = "../counterspeech/outputs/llama32_perspective_scores_final.json"
 
-    print(f"📄 Loading input: {input_file}")
+    print(f" Loading input: {input_file}")
     with open(input_file, "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -75,13 +75,13 @@ def main():
 
     # Resume support
     if os.path.exists(output_file):
-        print("⏩ Resuming from existing output...")
+        print(" Resuming from existing output...")
         with open(output_file, "r", encoding="utf-8") as f:
             results = json.load(f)
         start_index = len(results)
         print(f"➡ Starting from index {start_index}/{len(data)}")
 
-    print("🔄 Scoring comments...\n")
+    print(" Scoring comments...\n")
 
     for i in tqdm(range(start_index, len(data))):
         comment = data[i]["counterspeech_english"]
@@ -98,11 +98,11 @@ def main():
         # SAFE RATE LIMIT: 2 seconds
         time.sleep(1.5)
 
-    print("\n💾 Final save...")
+    print("\n Final save...")
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
 
-    print("✅ Done!")
+    print(" Done")
 
 
 if __name__ == "__main__":
