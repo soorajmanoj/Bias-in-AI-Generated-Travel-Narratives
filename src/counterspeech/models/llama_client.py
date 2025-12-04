@@ -1,18 +1,25 @@
 import json
+import os
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-# ----------------------------------------
-# LOAD MODEL (Llama-3.2-1B-Instruct, MPS)
-# ----------------------------------------
+# ============================================================
+# LOAD MODEL (Llama 3.2 - 1B - MPS)
+# ============================================================
+
 print("🔹 Loading meta-llama/Llama-3.2-1B-Instruct on mps...")
 
 device = "mps" if torch.backends.mps.is_available() else "cpu"
 
 tokenizer = AutoTokenizer.from_pretrained(
     "meta-llama/Llama-3.2-1B-Instruct",
-    trust_remote_code=True
+    trust_remote_code=True,
+    padding_side="left",     # REQUIRED for decoder-only batching
 )
+
+# Llama needs a pad token
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
 
 model = AutoModelForCausalLM.from_pretrained(
     "meta-llama/Llama-3.2-1B-Instruct",
@@ -21,13 +28,20 @@ model = AutoModelForCausalLM.from_pretrained(
     trust_remote_code=True
 )
 
+model.eval()
+model.generation_config.pad_token_id = tokenizer.pad_token_id
+model.generation_config.eos_token_id = tokenizer.eos_token_id
+
 print("✨ Model loaded successfully!")
 
 
-# ----------------------------------------
-# LOAD YOUR MERGED JSON FILE
-# ----------------------------------------
-INPUT_FILE = "../data/API_cleaned_data_full2.json"
+# ============================================================
+# LOAD INPUT FILE
+# ============================================================
+
+INPUT_FILE = "../../../data/clean/filtered/merged_output.json"
+PARTIAL_SAVE_FILE = "../outputs/llama_partial.json"
+FINAL_SAVE_FILE = "../outputs/llama32_counterspeech_output_final.json"
 
 with open(INPUT_FILE, "r") as f:
     data = json.load(f)
@@ -39,93 +53,145 @@ print(f"📌 Loaded {len(rom_hindi_comments)} Roman Hindi comments")
 print(f"📌 Loaded {len(english_comments)} English comments")
 
 
-# ----------------------------------------
-# COUNTERSPEECH PROMPT (ENGLISH ONLY)
-# ----------------------------------------
-# SYSTEM_PROMPT = """
-# You are a counterspeech assistant.
-#
-# Your job is to reply **only in English**, even when the input comment
-# is in Romanized Hindi or Hinglish.
-#
-# Guidelines:
-# - 1–2 sentence reply
-# - Natural, simple English
-# - Avoid jargon or complex vocabulary
-# """
-SYSTEM_PROMPT = """
-Reply in English only.
+# ============================================================
+# STRICT SYSTEM PROMPT (ANTI-HALLUCINATION)
+# ============================================================
 
-You are allowed to be:
-- sarcastic
-- rude
-- blunt and brutally honest
-- unimpressed or dismissive
-Guidelines:
-- Use 1–2 sentences.
-Keep replies short and sharp.
+SYSTEM_PROMPT = """
+You are a counterspeech generator. 
+You MUST reply ONLY to the user's comment.
+
+Rules:
+- English only.
+- Stay on-topic.
+- No advice, no explanations, no unrelated content.
+- 1–2 sentences maximum.
+- Tone allowed: sarcastic, rude, blunt, dismissive.
 """
 
+def build_prompt(comment: str) -> str:
+    return (
+        f"{SYSTEM_PROMPT}\n\n"
+        f"[COMMENT]: {comment}\n"
+        f"[RESPONSE]:"
+    )
 
 
-def build_prompt(comment):
-    return f"{SYSTEM_PROMPT}\nUser: {comment}\nAssistant:"
+# ============================================================
+# CLEAN OUTPUT
+# ============================================================
+
+def clean_output(text: str) -> str:
+    if "[RESPONSE]:" in text:
+        text = text.split("[RESPONSE]:", 1)[-1]
+
+    if "User:" in text:
+        text = text.split("User:", 1)[0]
+
+    if "[COMMENT]:" in text:
+        text = text.split("[COMMENT]:", 1)[0]
+
+    return text.strip()
 
 
-# ----------------------------------------
-# GENERATION FUNCTION
-# ----------------------------------------
-def generate_counterspeech(comment: str) -> str:
-    prompt = build_prompt(comment)
+# ============================================================
+# PARALLEL BATCH GENERATION (FAST + SAFE)
+# ============================================================
 
-    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+def generate_batch(comments):
+    prompts = [build_prompt(c) for c in comments]
 
-    with torch.no_grad():
+    batch_inputs = tokenizer(
+        prompts,
+        return_tensors="pt",
+        padding=True,
+        truncation=True
+    ).to(device)
+
+    with torch.inference_mode():
         outputs = model.generate(
-            **inputs,
+            **batch_inputs,
             max_new_tokens=60,
             temperature=0.7,
             top_p=0.9,
-            do_sample=True
+            do_sample=True,
+            pad_token_id=tokenizer.pad_token_id,
+            eos_token_id=tokenizer.eos_token_id,
         )
 
-    text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-    # Remove prompt echo if present
-    if "Assistant:" in text:
-        text = text.split("Assistant:")[-1].strip()
-
-    return text
+    decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+    cleaned = [clean_output(t) for t in decoded]
+    return cleaned
 
 
-# ----------------------------------------
-# PROCESS ALL COMMENTS
-# ----------------------------------------
+def batch(iterable, batch_size=16):
+    for i in range(0, len(iterable), batch_size):
+        yield iterable[i:i + batch_size]
+
+
+# ============================================================
+# AUTO-RESUME (LOAD PARTIAL PROGRESS)
+# ============================================================
+
 output = []
+
+if os.path.exists(PARTIAL_SAVE_FILE):
+    print("🔄 Resuming from existing partial output...")
+    with open(PARTIAL_SAVE_FILE, "r") as f:
+        output = json.load(f)
+else:
+    print("🆕 Starting fresh run...")
 
 all_comments = (
     [(c, "rom_hindi") for c in rom_hindi_comments] +
     [(c, "english") for c in english_comments]
 )
 
-print(f"📝 Generating counterspeech for {len(all_comments)} total comments...")
+start_index = len(output)
+print(f"➡️ Starting from index {start_index}")
 
-for comment, lang in all_comments:
-    reply = generate_counterspeech(comment)
-    output.append({
-        "comment": comment,
-        "language": lang,
-        "counterspeech_english": reply
-    })
+all_comments = all_comments[start_index:]
 
 
-# ----------------------------------------
-# SAVE OUTPUT
-# ----------------------------------------
-OUTPUT_FILE = "../outputs/llama32_counterspeech_output_final.json"
+# ============================================================
+# PROCESS COMMENTS WITH SAFE BATCH-SAVE
+# ============================================================
 
-with open(OUTPUT_FILE, "w") as f:
+print(f"📝 Processing remaining {len(all_comments)} comments...")
+
+BATCH_SIZE = 64  # adjust if needed (8 for safety, 24 for speed)
+
+for idx, comment_batch in enumerate(batch(all_comments, BATCH_SIZE), start=1):
+
+    texts = [c for c, lang in comment_batch]
+    replies = generate_batch(texts)
+
+    # Store batch output
+    for (orig_comment, lang), reply in zip(comment_batch, replies):
+        output.append({
+            "comment": orig_comment,
+            "language": lang,
+            "counterspeech_english": reply
+        })
+
+    # SAVE AFTER EVERY BATCH (CRASH-PROOF)
+    with open(PARTIAL_SAVE_FILE, "w") as f:
+        json.dump(output, f, indent=2, ensure_ascii=False)
+
+    print(f"  💾 Saved batch {idx} | Total processed: {len(output)}")
+
+
+# ============================================================
+# FINAL SAVE
+# ============================================================
+
+with open(FINAL_SAVE_FILE, "w") as f:
     json.dump(output, f, indent=2, ensure_ascii=False)
 
-print("✅ Finished!")
-print(f"💾 Saved to {OUTPUT_FILE}")
+print("🎉 COMPLETED — Final output saved!")
+print(f"💾 File: {FINAL_SAVE_FILE}")
+
+# Remove the partial file now that we're done
+if os.path.exists(PARTIAL_SAVE_FILE):
+    os.remove(PARTIAL_SAVE_FILE)
+    print("🧹 Removed partial save file.")
