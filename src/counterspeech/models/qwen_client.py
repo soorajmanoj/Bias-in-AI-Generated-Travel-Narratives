@@ -57,9 +57,7 @@ print(f"📌 Loaded {len(english_comments)} English comments")
 # ============================================================
 
 SYSTEM_PROMPT = """
-You are a counterspeech generator. 
 You MUST reply ONLY to the user's comment.
-
 Rules:
 - English only.
 - Stay on-topic.
@@ -67,7 +65,6 @@ Rules:
 - 1–2 sentences.
 - Tone: sarcastic, rude, blunt, dismissive.
 """
-
 def build_prompt(comment: str) -> str:
     return (
         f"{SYSTEM_PROMPT}\n\n"
@@ -110,7 +107,7 @@ def generate_counterspeech_batch(comments):
     with torch.inference_mode():
         outputs = model.generate(
             **batch_inputs,
-            max_new_tokens=60,
+            max_new_tokens=40,
             temperature=0.7,
             top_p=0.9,
             do_sample=True,
@@ -160,7 +157,7 @@ all_comments = all_comments[start_index:]
 
 print(f"📝 Processing {len(all_comments)} remaining comments...")
 
-BATCH_SIZE = 20
+BATCH_SIZE = 16
 
 for idx, comment_batch in enumerate(batch(all_comments, BATCH_SIZE), start=1):
 

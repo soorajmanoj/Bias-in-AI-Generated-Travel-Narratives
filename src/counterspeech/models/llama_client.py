@@ -159,7 +159,7 @@ all_comments = all_comments[start_index:]
 
 print(f"📝 Processing remaining {len(all_comments)} comments...")
 
-BATCH_SIZE = 64  # adjust if needed (8 for safety, 24 for speed)
+BATCH_SIZE = 16  # adjust if needed (8 for safety, 24 for speed)
 
 for idx, comment_batch in enumerate(batch(all_comments, BATCH_SIZE), start=1):
 
