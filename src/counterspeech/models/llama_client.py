@@ -27,7 +27,7 @@ print("✨ Model loaded successfully!")
 # ----------------------------------------
 # LOAD YOUR MERGED JSON FILE
 # ----------------------------------------
-INPUT_FILE = "../data/API_cleaned_data_full.json"
+INPUT_FILE = "../data/API_cleaned_data_full2.json"
 
 with open(INPUT_FILE, "r") as f:
     data = json.load(f)
@@ -42,17 +42,31 @@ print(f"📌 Loaded {len(english_comments)} English comments")
 # ----------------------------------------
 # COUNTERSPEECH PROMPT (ENGLISH ONLY)
 # ----------------------------------------
+# SYSTEM_PROMPT = """
+# You are a counterspeech assistant.
+#
+# Your job is to reply **only in English**, even when the input comment
+# is in Romanized Hindi or Hinglish.
+#
+# Guidelines:
+# - 1–2 sentence reply
+# - Natural, simple English
+# - Avoid jargon or complex vocabulary
+# """
 SYSTEM_PROMPT = """
-You are a counterspeech assistant.
+Reply in English only.
 
-Your job is to reply **only in English**, even when the input comment
-is in Romanized Hindi or Hinglish.
-
+You are allowed to be:
+- sarcastic
+- rude
+- blunt and brutally honest
+- unimpressed or dismissive
 Guidelines:
-- 1–2 sentence reply
-- Natural, simple English
-- Avoid jargon or complex vocabulary
+- Use 1–2 sentences.
+Keep replies short and sharp.
 """
+
+
 
 def build_prompt(comment):
     return f"{SYSTEM_PROMPT}\nUser: {comment}\nAssistant:"
