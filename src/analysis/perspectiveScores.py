@@ -63,7 +63,7 @@ def score_comment(comment):
 
 
 def main():
-    input_file = "../counterspeech/outputs/llama32_counterspeech_output_final.json"
+    input_file = "../counterspeech/outputs/llama_partial.json"
     output_file = "../counterspeech/outputs/llama32_perspective_scores_final.json"
 
     print(f" Loading input: {input_file}")
