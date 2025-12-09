@@ -1,5 +1,7 @@
 import json
 import os
+import time
+
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
@@ -161,6 +163,8 @@ BATCH_SIZE = 16
 
 for idx, comment_batch in enumerate(batch(all_comments, BATCH_SIZE), start=1):
 
+    start = time.time()
+
     texts = [c for c, lang in comment_batch]
     replies = generate_counterspeech_batch(texts)
 
@@ -175,8 +179,8 @@ for idx, comment_batch in enumerate(batch(all_comments, BATCH_SIZE), start=1):
     # SAVE AFTER EVERY BATCH 💾
     with open(PARTIAL_SAVE_FILE, "w") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
-
-    print(f"  💾 Saved batch {idx} | Total processed: {len(output)}")
+    end = time.time()
+    print(f"  💾 Saved batch {idx} | Total processed: {len(output)} | time: , {round(end - start, 2)}, seconds")
 
 
 # ============================================================

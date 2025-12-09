@@ -2,6 +2,7 @@ import json
 import os
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
+import time
 
 # ============================================================
 # LOAD MODEL (Llama 3.2 - 1B - MPS)
@@ -149,6 +150,7 @@ all_comments = (
 
 start_index = len(output)
 print(f"➡️ Starting from index {start_index}")
+print(f"⏱️  Start Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
 
 all_comments = all_comments[start_index:]
 
@@ -162,6 +164,9 @@ print(f"📝 Processing remaining {len(all_comments)} comments...")
 BATCH_SIZE = 16  # adjust if needed (8 for safety, 24 for speed)
 
 for idx, comment_batch in enumerate(batch(all_comments, BATCH_SIZE), start=1):
+    # print time stamp
+    start = time.time()
+
 
     texts = [c for c, lang in comment_batch]
     replies = generate_batch(texts)
@@ -178,7 +183,10 @@ for idx, comment_batch in enumerate(batch(all_comments, BATCH_SIZE), start=1):
     with open(PARTIAL_SAVE_FILE, "w") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
-    print(f"  💾 Saved batch {idx} | Total processed: {len(output)}")
+    end = time.time()
+
+
+    print(f"  💾 Saved batch {idx} | Total processed: {len(output)} | time: , {round(end - start, 2)}, seconds")
 
 
 # ============================================================
