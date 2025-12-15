@@ -1,167 +1,448 @@
 ﻿# Bias-in-AI-Generated-Travel-Narratives
 
-This repository contains code, preprocessing pipelines, counterspeech outputs,
-and analysis used to investigate model-produced counterspeech for travel-related
-YouTube comments. The README below explains how to reproduce the preliminary
-results and poster figures for the endterm paper.
+This repository contains the full data processing, analysis, and evaluation pipeline for the project “Bias in AI-Generated Travel Narratives”.
+The project studies how large language models (LLMs) generate counterspeech for toxic or biased travel-related user comments and examines toxicity bias, cultural bias, and evaluation bias using both human annotations and automated toxicity scoring tools.
+
+Core principle:
+Models are instruments, not the focus.
+They are used as probes to reveal patterns of bias in generated counterspeech and in downstream evaluation systems.
+---
+
+## Project Overview
+
+The pipeline consists of:
+
+1. Data collection from YouTube travel-related videos and comments  
+2. Data cleaning and preprocessing, including relevance filtering  
+3. Counterspeech generation using multiple LLMs  
+4. Toxicity evaluation using:
+   - Human annotations (human scale 0–5)
+   - Perspective API scores
+5. Comparative analysis and visualization to identify bias patterns
+---
+## Repository structure:
+```
+Bias-in-AI-Generated-Travel-Narratives/
+│
+├── data/                       # All datasets (raw and processed)
+│   ├── raw/                    # Raw YouTube comment data
+│   └── clean/                  # Cleaned, filtered, and labeled datasets
+│
+├── src/                        # Source code for the full pipeline
+│   ├── data_collection/        # YouTube scraping and video metadata collection
+│   ├── preprocessing/          # Cleaning, filtering, and data organization
+│   ├── counterspeech/          # LLM-based counterspeech generation and outputs
+│   ├── analysis/               # Toxicity analysis, bias metrics, and plots
+│   └── util/                   # Utility files (e.g., video ID lists)
+│
+├── results/                    # Topic modeling and keyword analysis outputs
+├── docs/                       # Generated documentation (Doxygen)
+├── requirements.txt            # Python dependencies
+├── Doxyfile                    # Doxygen configuration
+└── README.md                   # Project documentation
+```
+---
+## Datasets
+
+### Raw Data (`data/raw/`)
+
+- **Source:** YouTube travel-related videos and comments
+- **Files:**
+  - `youtube_data.json`
+  - `youtube_data_part_*.json`
+- **Content:**
+  - Video metadata
+  - User comments
+  - Comment text, timestamps, and identifiers
+
+This directory contains the unfiltered corpus and includes irrelevant, neutral, toxic, and noisy content.
 
 ---
 
-## Quick overview
+### Cleaned Data (`data/clean/`)
 
-- Main code areas:
-  - Data collection: src/data_collection/youtube_scraper.py, src/data_collection/video_collector.py
-  - Preprocessing: src/preprocessing/ (filtering, cleaning, jsonljson tools)
-  - Counterspeech model clients & outputs: src/counterspeech/models/ and src/counterspeech/outputs/
-  - Analysis & figures: src/analysis/poster.py
+Key files:
 
----
+- `cleaned_data_noLLM.json`  
+  Text-cleaned comments after normalization and deduplication
 
-## Environment & dependencies
+- `final_API_data.json`  
+  Fully processed dataset ready for filtering and counterspeech generation
 
-- Python 3.8+ recommended.
-- Install dependencies with:
+- `processing_progress.json`  
+  Tracks batch-level processing state
 
-`ash
-python -m pip install -r requirements.txt
-`
-
-It is recommended to use a virtual environment:
-
-`ash
-python -m venv .venv
-# Windows
-.\.venv\Scripts\activate
-# macOS / Linux
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-`
-
-Key packages used (listed in equirements.txt): pandas, matplotlib, scikit-learn,
-bertopic, google-api-python-client, python-dotenv, nltk, pyldavis, and others.
+- `skipped_batches.json`  
+  Logs skipped or failed processing batches
 
 ---
 
-## API keys and environment variables
+### Filtered and Labeled Data (`data/clean/filtered/`)
 
-- Create a .env file in the project root (or copy .env.example) and add:
+- `relevant.jsonl`  
+  Comments selected for counterspeech generation
 
-`
-YOUTUBE_API_KEY=your_api_key_here
-# Optional: keys for Perspective API or other services used by preprocessing
-# PERSPECTIVE_API_KEY=your_key_here
-`
+- `irrelevant.jsonl`  
+  Comments filtered out as unsuitable
 
-- To obtain a YouTube API key: enable the YouTube Data API v3 in Google Cloud
-  and create an API key under the project's Credentials page.
+- `error.jsonl`  
+  Comments that failed parsing or processing
 
-Note: some counterspeech model scripts may call external LLM services or
-require local model checkpoints; these are optional for reproducing figures
-because precomputed model outputs are included in the repository.
+- `llama32_counterspeech_output_final.json`  
+  Counterspeech generated using LLaMA 3.2
 
----
-
-## Included datasets and files
-
-- data/raw/ - raw YouTube JSON files (multiple parts are present in the repo).
-- data/clean/ - cleaned and merged datasets used in analysis (e.g. inal_API_data.json).
-- src/counterspeech/outputs/ - precomputed counterspeech and Perspective outputs used
-  by poster.py:
-  - llama32_scored_dataset_human.json
-  - qwen25_scored_dataset_human.json
-  - llama32_perspective_scores_final.json
-  - qwen25_perspective_scores_final.json
-
-If you prefer to re-run the YouTube data yourself, see the section below. If you want to
-skip heavy model inference, use the provided outputs in src/counterspeech/outputs/.
+- `qwen25_counterspeech_output_final.json`  
+  Counterspeech generated using Qwen 2.5
 
 ---
 
-## Reproducing the pipeline (recommended order)
+### Human and Automated Toxicity Scores
 
-1) (Optional) Fetch raw YouTube data
+Located in `src/counterspeech/outputs/`:
 
-`ash
-# from repository root
-python src/data_collection/youtube_scraper.py
-# or
-python src/data_collection/video_collector.py
-`
+- `*_scored_dataset_human.json`  
+  Human toxicity annotations (scale 0–5)
 
-These scripts read video IDs from data/video_ids.txt (or data/video_ids.csv),
-use YOUTUBE_API_KEY from .env, and write raw JSON to data/raw/ or the
-configured output path.
+- `*_perspective_scores_final.json`  
+  Perspective API toxicity scores for the same outputs
 
-2) Preprocess and clean
-
-Use the scripts in src/preprocessing/ to filter, clean, and convert jsonl to
-merged JSON. Example commands:
-
-`ash
-python src/preprocessing/scripts/split_youtube_data.py
-python src/preprocessing/filter.py
-python src/preprocessing/jsonl_to_json.py
-python src/preprocessing/organize.py
-`
-
-Note: some preprocessing scripts may require API keys if they call external
-scoring or cleaning APIs. The cleaned files in data/clean/ can be used to
-skip this step.
-
-3) (Optional / advanced) Generate counterspeech and human scores
-
-- Running the local model clients (LLaMA / Qwen) may require large model
-  downloads, GPU resources, and additional runtime packages. See
-  src/counterspeech/models/llama_client.py and qwen_client.py.
-- To avoid heavy compute, use the precomputed files in
-  src/counterspeech/outputs/ that are included with this repository.
-
-4) Generate poster / analysis figures
-
-The script src/analysis/poster.py reads files from src/counterspeech/outputs/
-and writes PNG figures to src/analysis/figures/ (created automatically).
-
-Run the script from the analysis directory so the relative paths match:
-
-`ash
-cd src/analysis
-python poster.py
-`
-
-This will produce files such as ig1_distribution_human.png,
-ig_perspective_diff_hist.png, and others under src/analysis/figures/.
+These paired datasets enable direct comparison between human judgment and automated evaluation.
 
 ---
 
-## Suggested minimal reproducible flow (fast)
+## Code Modules
 
-If you only want to reproduce the key figures in the deliverable, do this:
+### Data Collection (`src/data_collection/`)
 
-1. Ensure dependencies are installed.
-2. Ensure src/counterspeech/outputs/ contains the four JSON files listed above
-   (these are included in the repo).
-3. Run poster.py as shown in the previous section.
+- `youtube_scraper.py`  
+  Scrapes comments and metadata from YouTube
 
-This avoids re-downloading YouTube data and re-running model inference.
-
----
-
-## Notes, caveats and troubleshooting
-
-- Scripts use relative paths; run them from the directory assumed by the script
-  (the README commands show the recommended working directory).
-- If you plan to re-run model-based counterspeech generation, ensure you have
-  the compute resources and storage for model weights.
-- If an external API fails (rate limits or missing key), use the included
-  outputs to continue analysis.
+- `video_collector.py`  
+  Collects and organizes video-level information
 
 ---
 
-## Contact
+### Preprocessing (`src/preprocessing/`)
 
-If you have issues reproducing the results or want help adapting the pipeline,
-open an issue in the repository or contact the project owner.
+- `cleaning_api_multi_file.py`  
+  Text cleaning and multi-file preprocessing
+
+- `filter.py`  
+  Relevance filtering of comments
+
+- `jsonl_to_json.py`  
+  Format conversion utilities
+
+- `organize.py`  
+  Sorting and dataset organization
+
+- `scripts/split_youtube_data.py`  
+  Splits large raw datasets into smaller chunks
 
 ---
 
-*Prepared for the endterm paper reproducibility deliverable.*
+### Counterspeech Generation (`src/counterspeech/`)
+
+**Models (`models/`)**
+
+- `llama_client.py`  
+  Counterspeech generation using LLaMA 3.2
+
+- `qwen_client.py`  
+  Counterspeech generation using Qwen 2.5
+
+**Outputs (`outputs/`)**
+
+- Generated counterspeech datasets
+- Human-labeled toxicity data
+- Perspective API scoring results
+- Analysis figures
+
+---
+
+### Analysis (`src/analysis/`)
+
+- `analysis.py`  
+  Core statistical analysis
+
+- `final_analysis.py`  
+  Aggregated results used in the paper
+
+- `perspectiveScores.py`  
+  Perspective API scoring and normalization
+
+- `poster.py`  
+  Figure generation for posters and presentations
+
+---
+
+### Topic and Keyword Analysis (`results/`)
+
+- LDA topic modeling outputs
+- Keyword frequency analysis
+- Interactive topic visualizations
+
+---
+
+## Setup
+
+Follow these steps to set up the project on your local machine:
+
+#### 1. Clone the Repository:
+   Clone the repository to your local machine:
+   ```bash
+   git clone https://github.com/soorajmanoj/Bias-in-AI-Generated-Travel-Narratives.git
+   ```
+
+#### 2. Create a Hugging Face API Key:
+   - Go to [Hugging Face](https://huggingface.co/) and create an account if you don’t have one.
+   - After logging in, visit your [Hugging Face account settings](https://huggingface.co/settings/tokens) and generate an API key.
+   - Copy the generated API key.
+
+#### 3. Install Hugging Face CLI:
+   Install the Hugging Face CLI to configure and authenticate your API key:
+   ```bash
+   pip install huggingface-hub
+   ```
+
+#### 4. Authenticate with Hugging Face:
+   Use the Hugging Face CLI to log in and store your API key:
+   ```bash
+   huggingface-cli login
+   ```
+   - When prompted, paste your Hugging Face API key.
+
+#### 5. Install Dependencies:
+   Install the required libraries by running:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+   Alternatively, manually install the required libraries using:
+   ```bash
+   pip install <dependency-name>
+   ```
+
+#### 6. Set Up Perspective API Key:
+   - Go to the [Perspective API](https://www.perspectiveapi.com/) website and create an API key.
+   - Store the API key securely:
+     - Using Environment Variables:
+       - Set the environment variable:
+         ```bash
+         export PERSPECTIVE_API_KEY="your-api-key-here"
+         ```
+     - Or use a `.env` file (see `.env.sample` for a template) and load it using `python-dotenv`.
+
+---
+
+---
+
+## Code Reproducibility: Full End-to-End Pipeline
+
+This section documents the **complete execution pipeline**, from raw data collection to final analysis and figure generation. Running the steps in the specified order reproduces the datasets, evaluations, and preliminary results reported in the end-term paper.
+
+
+## Stage 1: Data Collection
+
+### Step 1.1: Video Metadata Collection
+
+**Script:** `src/data_collection/video_collector.py`
+
+Collects and organizes travel-related YouTube video metadata that defines the scope of comment scraping.
+
+**Output:**
+
+```text
+src/util/video_ids.csv
+```
+
+---
+
+### Step 1.2: YouTube Comment Scraping
+
+**Script:** `src/data_collection/youtube_scraper.py`
+
+Uses collected video IDs to retrieve:
+- User comments
+- Comment metadata (IDs, timestamps)
+- Video references
+
+**Output:**
+
+```text
+data/raw/youtube_data.json
+```
+
+---
+
+### Step 1.3: Raw Data Splitting
+
+**Script:** `src/preprocessing/scripts/split_youtube_data.py`
+
+Splits large raw datasets into smaller chunks to support batch processing and fault tolerance.
+
+**Output:**
+
+```text
+data/raw/youtube_data_part_*.json
+```
+
+---
+
+## Stage 2: Data Cleaning and Preparation
+
+### Step 2.1: Cleaning and Normalization
+
+**Script:** `src/preprocessing/cleaning_api_multi_file.py`
+
+Performs:
+- Text normalization
+- Deduplication
+- Structural validation across multiple raw files
+
+**Primary Output:**
+
+```text
+data/clean/cleaned_data_noLLM.json
+```
+
+---
+
+### Step 2.2: Relevance Filtering
+
+**Script:** `src/preprocessing/filter.py`
+
+Categorizes cleaned comments into:
+- Relevant
+- Irrelevant
+- Error
+
+This step determines which comments proceed to counterspeech generation.
+
+**Output Directory:**
+
+```text
+data/clean/filtered/
+```
+
+---
+
+### Step 2.3: Format Conversion
+
+**Script:** `src/preprocessing/jsonl_to_json.py`
+
+Converts filtered JSONL files into consolidated JSON format suitable for model input and evaluation.
+
+---
+
+### Step 2.4: Dataset Organization
+
+**Script:** `src/preprocessing/organize.py`
+
+Finalizes dataset structure by:
+- Sorting comments
+- Merging filtered outputs
+- Producing analysis-ready datasets
+
+**Final Clean Dataset:**
+
+```text
+data/clean/sorted/
+```
+
+---
+
+## Stage 3: Counterspeech Generation
+
+Counterspeech is generated using multiple large language models. Model-specific logic is encapsulated in separate client scripts.
+
+### Step 3.1: LLaMA-Based Counterspeech
+
+**Script:** `src/counterspeech/models/llama_client.py`
+
+Generates counterspeech responses for relevant comments using LLaMA 3.2.
+
+---
+
+### Step 3.2: Qwen-Based Counterspeech
+
+**Script:** `src/counterspeech/models/qwen_client.py`
+
+Generates counterspeech responses for the same inputs using Qwen 2.5.
+
+**Outputs (per model):**
+
+```text
+data/clean/filtered/*_counterspeech_output_final.json
+```
+
+---
+
+## Stage 4: Toxicity Scoring and Evaluation
+
+### Step 4.1: Automated Toxicity Scoring
+
+**Script:** `src/analysis/perspectiveScores.py`
+
+This step:
+- Queries the Perspective API
+- Normalizes toxicity scores
+- Aligns automated scores with human annotations (human scale 0–5)
+
+**Outputs:**
+
+```text
+src/counterspeech/outputs/*_perspective_scores_final.json
+```
+
+---
+
+### Step 4.2: Human-Annotated Alignment
+
+Human toxicity annotations are included as fixed datasets and aligned with automated scores for comparative evaluation.
+
+**Outputs:**
+
+```text
+src/counterspeech/outputs/*_scored_dataset_human.json
+```
+
+---
+
+## Stage 5: Analysis and Visualization
+
+### Step 5.1: Core Statistical Analysis
+
+**Script:** `src/analysis/analysis.py`
+
+Computes:
+- Toxicity distributions
+- Human vs automated score differences
+- Model-wise bias indicators
+
+---
+
+### Step 5.2: Final Aggregated Analysis
+
+**Script:** `src/analysis/final_analysis.py`
+
+Produces consolidated statistics and summaries used in the end-term paper.
+
+---
+
+### Step 5.3: Figure Generation
+
+Figures for the paper and poster are generated as part of the analysis process.
+
+**Output Directory:**
+
+```text
+src/counterspeech/outputs/figures/
+```
+
+---
+
+
+
+## License
+This project is licensed under the MIT License. See the LICENSE file for details.
