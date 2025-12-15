@@ -2,7 +2,16 @@ from googleapiclient.discovery import build
 import json
 import os
 from dotenv import load_dotenv
-import csv 
+import csv
+
+"""
+@file youtube_scraper.py
+@brief Helper functions and main script to fetch video metadata and comments using the YouTube API.
+
+Provides `get_youtube_service`, `get_video_details`, `get_video_comments` and a `main()`
+entry point that reads `util/video_ids.csv`, fetches titles and comments, and writes
+the aggregated results to `data/raw/youtube_data.json`.
+"""
 
 
 def get_youtube_service(api_key: str):
@@ -10,7 +19,6 @@ def get_youtube_service(api_key: str):
     @brief Creates a YouTube API service instance.
 
     @param api_key YouTube Data API v3 key.
-
     @return An authorized YouTube API service object.
     """
     return build("youtube", "v3", developerKey=api_key)
@@ -22,7 +30,6 @@ def get_video_details(youtube, video_id):
 
     @param youtube YouTube API service instance.
     @param video_id The ID of the YouTube video.
-
     @return The title of the video if found, otherwise None.
     """
     request = youtube.videos().list(part="snippet", id=video_id)
@@ -40,7 +47,6 @@ def get_video_comments(youtube, video_id, max_comments=10000):
     @param youtube YouTube API service instance.
     @param video_id The ID of the YouTube video.
     @param max_comments Maximum number of comments to fetch.
-
     @return A list of comment strings.
     """
     comments = []
@@ -59,16 +65,15 @@ def get_video_comments(youtube, video_id, max_comments=10000):
                 comments.append(comment)
                 if len(comments) >= max_comments:
                     break
-            
+
             if 'nextPageToken' in response:
                 request = youtube.commentThreads().list_next(request, response)
             else:
-                break 
+                break
     except Exception as e:
         print(f"An error occurred while fetching comments for {video_id}: {e}")
 
     return comments
-
 
 
 load_dotenv()
@@ -78,7 +83,7 @@ API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 VIDEO_ID_FILE = "../util/video_ids.csv"
 OUTPUT_DIR = "../../data/raw"
-OUTPUT_FILE = os.path.join(OUTPUT_DIR, "youtube_data.json")  
+OUTPUT_FILE = os.path.join(OUTPUT_DIR, "youtube_data.json")
 MAX_COMMENTS = 10000
 
 
@@ -86,20 +91,14 @@ def main():
     """
     @brief Entry point of the YouTube data extraction script.
 
-    @details
     Loads API key and video IDs from a CSV file, connects to the YouTube API,
     fetches video titles and comments, and saves the aggregated results to a single JSON file.
-
-    @exception ValueError if API key is missing.
-
-    @return None
     """
 
     if not API_KEY:
         raise ValueError("API Key not found. Please set YOUTUBE_API_KEY in your .env file.")
 
     youtube = get_youtube_service(API_KEY)
-
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -130,16 +129,13 @@ def main():
 
                 print(f"Processing Video ID: {video_id} (Type: {video_type})")
 
-                
                 title = get_video_details(youtube, video_id)
                 if not title:
                     print(f" Could not find title for video ID: {video_id}. Skipping.")
                     continue
 
-                
                 comments = get_video_comments(youtube, video_id, MAX_COMMENTS)
 
-               
                 video_data = {
                     "video_id": video_id,
                     "type": video_type,
@@ -147,7 +143,6 @@ def main():
                     "comments": comments
                 }
 
-                
                 all_videos_data.append(video_data)
                 existing_ids.add(video_id)
                 print(f"Collected {len(comments)} comments for {video_id}.")
@@ -156,7 +151,6 @@ def main():
         print(f"Error: The file {VIDEO_ID_FILE} was not found.")
         return
 
-    # Save the aggregated data to a single JSON file after the loop
     with open(OUTPUT_FILE, "w", encoding="utf-8") as vf:
         json.dump(all_videos_data, vf, indent=4, ensure_ascii=False)
 

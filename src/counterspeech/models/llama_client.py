@@ -4,9 +4,13 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import time
 
-# ============================================================
-# LOAD MODEL (Llama 3.2 - 1B - MPS)
-# ============================================================
+"""
+@file llama_client.py
+@brief Local LLaMA-based counterspeech generator utilities and batch processing harness.
+
+Loads a local LLaMA model, builds prompts, generates counterspeech in batches,
+supports auto-resume from partial runs, and saves final outputs.
+"""
 
 print("🔹 Loading meta-llama/Llama-3.2-1B-Instruct on mps...")
 
@@ -15,10 +19,9 @@ device = "mps" if torch.backends.mps.is_available() else "cpu"
 tokenizer = AutoTokenizer.from_pretrained(
     "meta-llama/Llama-3.2-1B-Instruct",
     trust_remote_code=True,
-    padding_side="left",     # REQUIRED for decoder-only batching
+    padding_side="left",
 )
 
-# Llama needs a pad token
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -35,11 +38,6 @@ model.generation_config.eos_token_id = tokenizer.eos_token_id
 
 print("✨ Model loaded successfully!")
 
-
-# ============================================================
-# LOAD INPUT FILE
-# ============================================================
-
 INPUT_FILE = "../../../data/clean/filtered/merged_output.json"
 PARTIAL_SAVE_FILE = "../outputs/llama_partial.json"
 FINAL_SAVE_FILE = "../../../data/clean/filtered/llama32_counterspeech_output_final.json"
@@ -53,11 +51,6 @@ english_comments = data.get("english", [])
 print(f"📌 Loaded {len(rom_hindi_comments)} Roman Hindi comments")
 print(f"📌 Loaded {len(english_comments)} English comments")
 
-
-# ============================================================
-# STRICT SYSTEM PROMPT (ANTI-HALLUCINATION)
-# ============================================================
-
 SYSTEM_PROMPT = """
 You are a counterspeech generator. 
 You MUST reply ONLY to the user's comment.
@@ -70,7 +63,14 @@ Rules:
 - Tone allowed: sarcastic, rude, blunt, dismissive.
 """
 
+
 def build_prompt(comment: str) -> str:
+    """
+    @brief Build the system prompt and inject the comment to be responded to.
+
+    @param comment Original user comment string.
+    @return The full prompt string sent to the model.
+    """
     return (
         f"{SYSTEM_PROMPT}\n\n"
         f"[COMMENT]: {comment}\n"
@@ -78,11 +78,13 @@ def build_prompt(comment: str) -> str:
     )
 
 
-# ============================================================
-# CLEAN OUTPUT
-# ============================================================
-
 def clean_output(text: str) -> str:
+    """
+    @brief Post-process generated text to extract only the response portion.
+
+    @param text Raw model output.
+    @return Cleaned response string.
+    """
     if "[RESPONSE]:" in text:
         text = text.split("[RESPONSE]:", 1)[-1]
 
@@ -95,11 +97,13 @@ def clean_output(text: str) -> str:
     return text.strip()
 
 
-# ============================================================
-# PARALLEL BATCH GENERATION (FAST + SAFE)
-# ============================================================
-
 def generate_batch(comments):
+    """
+    @brief Generate counterspeech for a list of comments using the local model.
+
+    @param comments List of comment strings.
+    @return List of generated responses.
+    """
     prompts = [build_prompt(c) for c in comments]
 
     batch_inputs = tokenizer(
@@ -126,13 +130,15 @@ def generate_batch(comments):
 
 
 def batch(iterable, batch_size=16):
+    """
+    @brief Yield successive batches from an iterable.
+
+    @param iterable List-like input.
+    @param batch_size Batch size.
+    """
     for i in range(0, len(iterable), batch_size):
         yield iterable[i:i + batch_size]
 
-
-# ============================================================
-# AUTO-RESUME (LOAD PARTIAL PROGRESS)
-# ============================================================
 
 output = []
 
@@ -154,24 +160,16 @@ print(f"⏱️  Start Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()
 
 all_comments = all_comments[start_index:]
 
-
-# ============================================================
-# PROCESS COMMENTS WITH SAFE BATCH-SAVE
-# ============================================================
-
 print(f"📝 Processing remaining {len(all_comments)} comments...")
 
-BATCH_SIZE = 16  # adjust if needed (8 for safety, 24 for speed)
+BATCH_SIZE = 16
 
 for idx, comment_batch in enumerate(batch(all_comments, BATCH_SIZE), start=1):
-    # print time stamp
     start = time.time()
-
 
     texts = [c for c, lang in comment_batch]
     replies = generate_batch(texts)
 
-    # Store batch output
     for (orig_comment, lang), reply in zip(comment_batch, replies):
         output.append({
             "comment": orig_comment,
@@ -179,19 +177,12 @@ for idx, comment_batch in enumerate(batch(all_comments, BATCH_SIZE), start=1):
             "counterspeech_english": reply
         })
 
-    # SAVE AFTER EVERY BATCH (CRASH-PROOF)
     with open(PARTIAL_SAVE_FILE, "w") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
     end = time.time()
 
-
     print(f"  💾 Saved batch {idx} | Total processed: {len(output)} | time: , {round(end - start, 2)}, seconds")
-
-
-# ============================================================
-# FINAL SAVE
-# ============================================================
 
 with open(FINAL_SAVE_FILE, "w") as f:
     json.dump(output, f, indent=2, ensure_ascii=False)
@@ -199,7 +190,6 @@ with open(FINAL_SAVE_FILE, "w") as f:
 print("🎉 COMPLETED — Final output saved!")
 print(f"💾 File: {FINAL_SAVE_FILE}")
 
-# Remove the partial file now that we're done
 if os.path.exists(PARTIAL_SAVE_FILE):
     os.remove(PARTIAL_SAVE_FILE)
     print("🧹 Removed partial save file.")

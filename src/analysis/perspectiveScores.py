@@ -6,6 +6,14 @@ import re
 from dotenv import load_dotenv
 from tqdm import tqdm
 
+"""
+@file perspectiveScores.py
+@brief Score counterspeech text using the Google Perspective API with retry and checkpointing.
+
+Provides a safe `score_comment` helper with backoff for 429s and a `main()` that
+iterates over a counterspeech output file, scores each comment, and saves progress periodically.
+"""
+
 load_dotenv()
 PERSPECTIVE_API_KEY = os.getenv("PERSPECTIVE_API_KEY")
 
@@ -22,17 +30,28 @@ ATTRS = {
     "IDENTITY_ATTACK": {}
 }
 
-CHUNK_SAVE_INTERVAL = 25  # save progress every 25 comments
+CHUNK_SAVE_INTERVAL = 25
 
 
 def clean(text):
+    """
+    @brief Clean control characters from text and coerce non-strings.
+
+    @param text Input text.
+    @return Cleaned string.
+    """
     if not isinstance(text, str):
         text = str(text)
     return re.sub(r"[\x00-\x1F\x7F]", "", text).strip()
 
 
 def score_comment(comment):
-    """Safe Perspective API call with retry and backoff."""
+    """
+    @brief Safe Perspective API call with retry and exponential backoff on rate limit.
+
+    @param comment Comment string to score.
+    @return Dict of attribute scores (values or None on error).
+    """
     payload = {
         "comment": {"text": clean(comment)},
         "languages": ["en"],
@@ -55,7 +74,7 @@ def score_comment(comment):
         elif resp.status_code == 429:
             print(" Rate limit exceeded — waiting 3 seconds...")
             time.sleep(3)
-            continue  # retry
+            continue
 
         else:
             print(f" API ERROR {resp.status_code}: {resp.text}")
@@ -73,7 +92,6 @@ def main():
     results = []
     start_index = 0
 
-    # Resume support
     if os.path.exists(output_file):
         print(" Resuming from existing output...")
         with open(output_file, "r", encoding="utf-8") as f:
@@ -90,12 +108,10 @@ def main():
 
         results.append({"comment": comment, "lang": language, "perspective_scores": score})
 
-        # Save checkpoint every 25 items
         if i % CHUNK_SAVE_INTERVAL == 0:
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(results, f, indent=2, ensure_ascii=False)
 
-        # SAFE RATE LIMIT: 2 seconds
         time.sleep(1)
 
     print("\n Final save...")

@@ -15,6 +15,15 @@ except Exception:
 
 from dotenv import load_dotenv
 
+"""
+@file cleaning_api_multi_file.py
+@brief Utilities to load environment, call Gemini in batches to clean comments,
+merge outputs, track progress, and save skipped API batches for later retry.
+
+This module exposes helper functions to discover API keys, format ETA times,
+process comment batches via the Gemini API, merge results into the final
+cleaned JSON, and maintain progress/skipped batch state.
+"""
 
 MODEL_NAME = 'gemini-2.5-flash-lite'
 DEFAULT_BATCH_SIZE = 25
@@ -24,7 +33,11 @@ SKIPPED_BATCHES_FILE = "skipped_batches.json"
 
 
 def load_env(root: Path):
+    """
+    @brief Load environment variables from a .env file if present.
 
+    @param root Repository root path used to locate a .env file.
+    """
     env_path = root / '.env'
     try:
         if env_path.exists():
@@ -36,7 +49,15 @@ def load_env(root: Path):
 
 
 def save_skipped_batch(file_path: Path, part_file: str, video_index: int, batch_index: int, comments):
-    """Append skipped batch info to skipped_batches.json for later reprocessing."""
+    """
+    @brief Append information about a skipped batch to a JSON file for later reprocessing.
+
+    @param file_path Path to the JSON file to append the skipped batch metadata.
+    @param part_file The part file name containing the skipped batch.
+    @param video_index Index of the video within the part file.
+    @param batch_index Index of the batch within the video.
+    @param comments The list of comments in the skipped batch.
+    """
     file_path.parent.mkdir(parents=True, exist_ok=True)
     data = []
 
@@ -63,13 +84,23 @@ def save_skipped_batch(file_path: Path, part_file: str, video_index: int, batch_
     logging.warning(f"Saved skipped batch {batch_index} from video {video_index} in file {part_file}")
 
 
-
 def discover_api_keys():
+    """
+    @brief Find all environment variables that look like Google API keys.
+
+    @return List of API key strings present in the environment.
+    """
     keys = [v for k, v in os.environ.items() if k.startswith('GOOGLE_API_KEY_') and v.strip()]
     return keys
 
 
 def format_time(seconds):
+    """
+    @brief Format a seconds-based duration into a human-readable string.
+
+    @param seconds Duration in seconds (may be fractional).
+    @return Formatted time string.
+    """
     if seconds < 0:
         return "0s"
     hours, rem = divmod(seconds, 3600)
@@ -82,7 +113,15 @@ def format_time(seconds):
 
 
 def process_comments_in_batch(model_name, comments_batch, current_api_key, attempt=1):
-    """Send a batch to Gemini. Returns parsed JSON list or None on failure."""
+    """
+    @brief Send a batch of comments to Gemini for cleaning/classification.
+
+    @param model_name Name of the Gemini model to call.
+    @param comments_batch List of comment strings to process.
+    @param current_api_key API key to use for the request.
+    @param attempt Current retry attempt (used internally).
+    @return Parsed JSON list of results matching `comments_batch` length, or None on failure.
+    """
     if genai is None:
         logging.error("google.generativeai not available. Install dependency to call API.")
         return None
@@ -121,7 +160,12 @@ def process_comments_in_batch(model_name, comments_batch, current_api_key, attem
 
 
 def merge_and_save_output(output_path: Path, all_cleaned_data: dict):
+    """
+    @brief Merge newly cleaned comments into the existing final JSON output and atomically save.
 
+    @param output_path Path to the final JSON output file.
+    @param all_cleaned_data Dict with keys `rom_hindi`, `english`, `other` and lists of texts.
+    """
     existing = {"rom_hindi": [], "english": [], "other": []}
     if output_path.exists():
         try:
@@ -130,11 +174,9 @@ def merge_and_save_output(output_path: Path, all_cleaned_data: dict):
         except Exception:
             logging.warning(f"Could not read existing output at {output_path}, starting fresh.")
 
-
     for k in ("rom_hindi", "english", "other"):
         existing.setdefault(k, [])
         all_cleaned_data.setdefault(k, [])
-
 
     seen = set(existing.get("rom_hindi", []) + existing.get("english", []) + existing.get("other", []))
     added = 0
@@ -145,7 +187,6 @@ def merge_and_save_output(output_path: Path, all_cleaned_data: dict):
                 seen.add(t)
                 added += 1
 
-
     tmp_path = output_path.with_suffix('.tmp.json')
     with tmp_path.open('w', encoding='utf-8') as f:
         json.dump(existing, f, ensure_ascii=False, indent=2)
@@ -154,6 +195,13 @@ def merge_and_save_output(output_path: Path, all_cleaned_data: dict):
 
 
 def update_progress(progress_path: Path, last_index: int, filename: str):
+    """
+    @brief Write progress metadata to a JSON file.
+
+    @param progress_path Path to the progress JSON file.
+    @param last_index Last processed part index.
+    @param filename The filename last processed.
+    """
     data = {
         "last_processed_index": last_index,
         "last_processed_file": filename,
@@ -165,6 +213,12 @@ def update_progress(progress_path: Path, last_index: int, filename: str):
 
 
 def load_progress(progress_path: Path):
+    """
+    @brief Load progress metadata if present.
+
+    @param progress_path Path to the progress file.
+    @return Loaded dict or None.
+    """
     if progress_path.exists():
         try:
             return json.load(progress_path.open('r', encoding='utf-8'))
@@ -189,7 +243,6 @@ def main(argv=None):
     script_dir = Path(__file__).resolve().parent
     repo_root = script_dir.resolve().parents[2]
 
-    # File Locations
     parts_glob = args.parts_glob or str(repo_root / "Bias-in-AI-Generated-Travel-Narratives" / 'data' / 'raw' / 'youtube_data_part_*.json')
     output_path = Path(args.output) if args.output else repo_root / "Bias-in-AI-Generated-Travel-Narratives" / 'data' / 'clean' / 'final_API_data.json'
     progress_path = Path(args.progress_file) if args.progress_file else repo_root / "Bias-in-AI-Generated-Travel-Narratives" / 'data' / 'clean' / 'processing_progress.json'
@@ -205,19 +258,16 @@ def main(argv=None):
 
     key_cycler = itertools.cycle(enumerate(api_keys, 1))
 
-
     part_files = sorted(glob.glob(parts_glob))
     if not part_files:
         logging.error(f"No part files found with pattern: {parts_glob}")
         sys.exit(1)
-
 
     start_idx = 1
     if args.start_file:
         if args.start_file in part_files:
             start_idx = part_files.index(args.start_file) + 1
         else:
-
             p = str(Path(args.start_file))
             if p in part_files:
                 start_idx = part_files.index(p) + 1
@@ -254,7 +304,6 @@ def main(argv=None):
             logging.error(f"Could not read {part}: {e}")
             continue
 
-
         all_cleaned_data = {"rom_hindi": [], "english": [], "other": []}
 
         for video in videos:
@@ -275,7 +324,6 @@ def main(argv=None):
                     batch_number = i // args.batch_size + 1
                     logging.warning(f"Skipping batch {batch_number} of video due to API failure.")
 
-                    # SAVE THE SKIPPED BATCH
                     save_skipped_batch(
                         file_path=repo_root / "Bias-in-AI-Generated-Travel-Narratives" / "data" / "clean" / SKIPPED_BATCHES_FILE,
                         part_file=str(part),
@@ -298,7 +346,6 @@ def main(argv=None):
                 cat = r.get('classification')
                 text = (r.get('cleaned_text') or '').strip()
                 if not text or cat not in all_cleaned_data:
-
                     if text and cat not in all_cleaned_data:
                         all_cleaned_data.setdefault('other', []).append(text)
                     continue
@@ -309,10 +356,8 @@ def main(argv=None):
 
             logging.info(f"Added {added_count} new unique comments from current video.")
 
-
         output_path.parent.mkdir(parents=True, exist_ok=True)
         merge_and_save_output(output_path, all_cleaned_data)
-
 
         update_progress(progress_path, idx, str(part))
 

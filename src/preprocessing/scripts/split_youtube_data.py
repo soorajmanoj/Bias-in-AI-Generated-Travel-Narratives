@@ -3,6 +3,14 @@ import json
 import math
 import sys
 
+"""
+@file split_youtube_data.py
+@brief Split a large JSON array of videos into smaller numbered part files.
+
+The script reads `data/raw/youtube_data.json` and writes chunked files
+`youtube_data_part_{n}.json` using `CHUNK_SIZE` videos per file.
+"""
+
 CHUNK_SIZE = 3
 
 root = Path(__file__).resolve().parent.parent.parent.parent
@@ -12,7 +20,6 @@ output_dir = root / 'data' / 'raw'
 if not input_path.exists():
     print(f"Input file not found: {input_path}")
     sys.exit(1)
-
 
 with input_path.open('r', encoding='utf-8') as f:
     data = json.load(f)

@@ -4,10 +4,18 @@ import time
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 
+"""
+@file video_collector.py
+@brief Search YouTube for travel vlogs, collect video IDs and label channels by country.
+
+The module provides utilities to query the YouTube Search API for travel-related
+videos, determine channel country, label it as `indian`/`foreign`/`unknown`, and
+append results to `util/video_ids.csv` avoiding duplicates.
+"""
+
 load_dotenv()
 API_KEY = os.getenv("YOUTUBE_API_KEY")
 youtube = build("youtube", "v3", developerKey=API_KEY)
-
 
 SEARCH_QUERIES = [
     "travel vlog India",
@@ -17,7 +25,15 @@ SEARCH_QUERIES = [
     "backpacking India vlog"
 ]
 
+
 def search_travel_videos(query, max_results=25):
+    """
+    @brief Search YouTube for videos matching a query.
+
+    @param query Search query string.
+    @param max_results Max results to request (<=50 enforced by API).
+    @return List of tuples (videoId, channelId).
+    """
     request = youtube.search().list(
         q=query,
         part="id,snippet",
@@ -31,7 +47,14 @@ def search_travel_videos(query, max_results=25):
     response = request.execute()
     return [(item['id']['videoId'], item['snippet']['channelId']) for item in response.get('items', [])]
 
+
 def get_channel_country(channel_id):
+    """
+    @brief Retrieve the country code for a channel, if available.
+
+    @param channel_id YouTube channel ID.
+    @return Country code string or None.
+    """
     request = youtube.channels().list(
         part="snippet",
         id=channel_id
@@ -42,23 +65,34 @@ def get_channel_country(channel_id):
         return items[0]["snippet"].get("country", None)
     return None
 
+
 def label_country(country):
+    """
+    @brief Convert an ISO country code to a label used in the CSV.
+
+    @param country ISO country code or None.
+    @return "indian", "foreign", or "unknown".
+    """
     if country is None:
         return "unknown"
     return "indian" if country.upper() == "IN" else "foreign"
 
+
 def collect_and_label_videos():
+    """
+    @brief Main loop to collect and label videos until 50 unique items are found.
+
+    Writes results to `util/video_ids.csv`, avoiding duplicates.
+    """
     collected = []
 
     output_csv = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'util', 'video_ids.csv'))
     seen_ids = set()
 
-
     if os.path.exists(output_csv):
         try:
             with open(output_csv, newline='', encoding='utf-8') as f:
                 reader = csv.reader(f)
-                # skip header if present
                 headers = next(reader, None)
                 for row in reader:
                     if row:
@@ -99,6 +133,7 @@ def collect_and_label_videos():
         print(f"Saved labeled travel vlogs to {output_csv}")
     except Exception as e:
         print(f"Error writing to {output_csv}: {e}")
+
 
 if __name__ == "__main__":
     collect_and_label_videos()

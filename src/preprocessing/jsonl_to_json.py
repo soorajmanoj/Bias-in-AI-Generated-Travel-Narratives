@@ -1,5 +1,13 @@
 import json
 
+"""
+@file jsonl_to_json.py
+@brief Convert a .jsonl file of comment objects into a merged JSON list separated by language.
+
+Reads `relevant.jsonl`, extracts `comment` values grouped by `language`, and writes
+the consolidated JSON file `merged_output.json` with `rom_hindi` and `english` lists.
+"""
+
 input_file = "../../data/clean/filtered/relevant.jsonl"
 output_file = "../../data/clean/filtered/merged_output.json"
 
@@ -22,11 +30,9 @@ with open(input_file, "r", encoding="utf-8") as f:
 
         if lang == "rom_hindi":
             rom_hindi_list.append(comment)
-
         elif lang == "english":
             english_list.append(comment)
 
-# Final JSON
 final_output = {
     "rom_hindi": rom_hindi_list,
     "english": english_list

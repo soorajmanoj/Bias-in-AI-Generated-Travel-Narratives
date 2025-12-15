@@ -1,0 +1,26 @@
+var searchData=
+[
+  ['calibration_0',['calibration',['../namespacefinal__analysis.html#ac6dfa3a9733e9164ec86dd7b812fd813',1,'final_analysis']]],
+  ['capsize_1',['capsize',['../namespaceanalysis.html#a60983fac600df53a80da091ad50c64df',1,'analysis']]],
+  ['caveats_20and_20troubleshooting_2',['Notes, caveats and troubleshooting',['../index.html#autotoc_md20',1,'']]],
+  ['chunk_3',['chunk',['../namespacesplit__youtube__data.html#a38e6ff3c4c01fbc84e3b4db3c76bfac3',1,'split_youtube_data']]],
+  ['chunk_5fsave_5finterval_4',['CHUNK_SAVE_INTERVAL',['../namespaceperspective_scores.html#adbfbb65c7110cc3b4afac07ad0a2cb4e',1,'perspectiveScores']]],
+  ['chunk_5fsize_5',['CHUNK_SIZE',['../namespacesplit__youtube__data.html#a7c535912acda707398f27c1bda86eb6b',1,'split_youtube_data']]],
+  ['ci_5fhigh_6',['ci_high',['../namespaceanalysis.html#a73f36de577cf951b90ed52fabcc3e780',1,'analysis']]],
+  ['ci_5flow_7',['ci_low',['../namespaceanalysis.html#a66967539a870612af5a963396473daa1',1,'analysis']]],
+  ['classify_5fcomment_8',['classify_comment',['../namespacefilter.html#afa03d3f156f4f17d6d58120671cefc6f',1,'filter']]],
+  ['clean_9',['clean',['../namespaceperspective_scores.html#a3c18f0ad03e7bb2437a76f683c80e735',1,'perspectiveScores']]],
+  ['clean_5fcomments_10',['clean_comments',['../namespaceorganize.html#a10eb376548b9763a9afb5d9940554db0',1,'organize']]],
+  ['clean_5foutput_11',['clean_output',['../namespacellama__client.html#a48ca3760190acad89583c33f480f8d9b',1,'llama_client.clean_output()'],['../namespaceqwen__client.html#a9e0e69bcc1a0152f10a67cbe4595af15',1,'qwen_client.clean_output()']]],
+  ['cleaning_5fapi_5fmulti_5ffile_12',['cleaning_api_multi_file',['../namespacecleaning__api__multi__file.html',1,'']]],
+  ['cleaning_5fapi_5fmulti_5ffile_2epy_13',['cleaning_api_multi_file.py',['../cleaning__api__multi__file_8py.html',1,'']]],
+  ['cmap_14',['cmap',['../namespaceanalysis.html#abb7bac5e314f01f1e3ff83e5b2936b47',1,'analysis.cmap'],['../namespaceposter.html#a848a714045b2275fbabf596bce6f37a7',1,'poster.cmap']]],
+  ['collect_5fand_5flabel_5fvideos_15',['collect_and_label_videos',['../namespacevideo__collector.html#ab85803551dee8154ae528b5500c0ebce',1,'video_collector']]],
+  ['color_16',['color',['../namespacefinal__analysis.html#aaffd8daef984676bc55ba59b5a787832',1,'final_analysis.color'],['../namespaceposter.html#a0f49b41e2cbe4eac4e6e368c3fc7b7e8',1,'poster.color']]],
+  ['comment_17',['comment',['../namespacejsonl__to__json.html#af7e39d4313610b9f950dfe409c24d545',1,'jsonl_to_json']]],
+  ['compare_5fhuman_5fpersp_18',['compare_human_persp',['../namespacefinal__analysis.html#afbf0c4452ae89adf59f0fc87284c7dde',1,'final_analysis']]],
+  ['contact_19',['Contact',['../index.html#autotoc_md22',1,'']]],
+  ['context_20',['context',['../namespaceposter.html#a3a872b7b59fbf3e0e7ad77c1d04d4cb4',1,'poster']]],
+  ['count_21',['count',['../namespacesplit__youtube__data.html#ac6bc0c02fb2ed4bc65b698ca6f731c4a',1,'split_youtube_data']]],
+  ['created_5ffiles_22',['created_files',['../namespacesplit__youtube__data.html#aba1a91ac42e479cead7880d3acea60e5',1,'split_youtube_data']]]
+];

@@ -3,29 +3,37 @@ import json
 import os
 from dotenv import load_dotenv
 import time
-import ijson  # For streaming large JSON
+import ijson
 
 load_dotenv()
 
-# --- 1. Configuration ---
-# Make sure to set your API key in your environment or paste it here.
+"""
+@file filter.py
+@brief Stream and classify YouTube comments using the Gemini API and write results to JSONL files.
+
+Module-level configuration values control the input file, output files, rate limiting,
+and the model instruction sent to the Gemini API. Functions in this module perform
+single-comment classification, efficient appends to JSONL files, streaming processing
+of comments for specified language keys, and an entry-point `main()` to run the
+end-to-end pipeline.
+
+@note Requires environment variable `GOOGLE_API_KEY_8` to be set and valid.
+"""
+
 API_KEY = os.getenv("GOOGLE_API_KEY_8")
 if API_KEY:
     print("API Key loaded successfully.")
-    # You can now use the API_KEY variable in your application
 else:
     print("Error: API_KEY not found in environment variables.")
 genai.configure(api_key=API_KEY)
 
-# --- 2. File Configuration ---
-INPUT_FILE = "../../data/clean/final_API_data.json"  # <-- Your huge input JSON
+INPUT_FILE = "../../data/clean/final_API_data.json"
 RELEVANT_OUTPUT_FILE = "../../data/clean/filtered/relevant.jsonl"
 IRRELEVANT_OUTPUT_FILE = "../../data/clean/filtered/irrelevant.jsonl"
-ERROR_OUTPUT_FILE = "../../data/clean/filtered/error.jsonl"  # <-- NEW: File for errors
+ERROR_OUTPUT_FILE = "../../data/clean/filtered/error.jsonl"
 
-RATE_LIMIT_DELAY = 0.2  # 1-second delay to be nice to the API
+RATE_LIMIT_DELAY = 0.2
 
-# --- 3. Updated Model Instruction (from your last prompt) ---
 MODEL_INSTRUCTION = """
 You are analyzing YouTube comments on travel vlogs related to India for a project on societal biases.
 Your task is to classify each comment as “relevant” or “irrelevant” based on a strict definition.
@@ -53,16 +61,16 @@ Return results as JSON with two fields:
 }
 """
 
-# --- 4. Setup Gemini Model ---
 model = genai.GenerativeModel('gemini-2.5-flash-lite')
 generation_config = genai.GenerationConfig(response_mime_type="application/json")
 
 
-# --- 5. Helper Function for Classification (with the list/dict fix) ---
 def classify_comment(comment_text):
     """
-    Sends a single comment to the Gemini API for classification.
-    Returns the classification string ("relevant", "irrelevant", or "ERROR")
+    @brief Classify a single comment via the Gemini API.
+
+    @param comment_text The comment text to classify.
+    @return A lowercase classification string: "relevant", "irrelevant", or "error".
     """
     prompt_for_api = f"{MODEL_INSTRUCTION}\n\n---\nPlease classify the following comment:\n\"{comment_text}\""
 
@@ -92,17 +100,19 @@ def classify_comment(comment_text):
         return classification_dict.get("classification", "ERROR").lower()
 
     except Exception as e:
-        # This will catch API key errors, JSON parsing errors, etc.
         print(f"--- ERROR classifying comment: {comment_text[:50]}...")
         print(f"--- Error details: {e}")
         return "ERROR"
 
 
-# --- 6. Helper Function for Efficient Writing ---
 def append_to_jsonl(filename, comment, language):
     """
-    Appends a new line to a .jsonl file.
-    Each line is a self-contained JSON object.
+    @brief Append a JSON object as a single line to a .jsonl file.
+
+    @param filename Path to the JSONL file to append to.
+    @param comment The comment text to include in the object.
+    @param language The language key associated with the comment.
+    @return None
     """
     output_data = {
         "comment": comment,
@@ -116,11 +126,13 @@ def append_to_jsonl(filename, comment, language):
         print(f"--- ERROR writing to {filename}: {e}")
 
 
-# --- 7. Main Streaming Logic ---
 def process_comments(language_key):
     """
-    Streams comments for a specific key (e.g., 'rom_hindi')
-    from the input file, classifies, and writes to output .jsonl files.
+    @brief Stream comments for a language key from the configured input file, classify each
+    comment, and write to the appropriate output JSONL files.
+
+    @param language_key The key within the input JSON whose items will be processed.
+    @return None
     """
     print(f"\n--- Starting processing for: {language_key} ---")
     total_count = 0
@@ -129,7 +141,7 @@ def process_comments(language_key):
     error_count = 0
 
     try:
-        with open(INPUT_FILE, 'rb') as f:  # Open in binary mode for ijson
+        with open(INPUT_FILE, 'rb') as f:
             comments_stream = ijson.items(f, f'{language_key}.item')
 
             for comment in comments_stream:
@@ -152,9 +164,6 @@ def process_comments(language_key):
                     append_to_jsonl(IRRELEVANT_OUTPUT_FILE, comment, language_key)
                     irrelevant_count += 1
                 else:
-                    # --- THIS IS THE CHANGE ---
-                    # classification == "ERROR"
-                    # Log this comment to the error file for review/retry later
                     append_to_jsonl(ERROR_OUTPUT_FILE, comment, language_key)
                     error_count += 1
 
@@ -169,12 +178,15 @@ def process_comments(language_key):
     print(f"Total: {total_count}, Relevant: {relevant_count}, Irrelevant: {irrelevant_count}, Errors: {error_count}")
 
 
-# --- 8. Run the Script ---
 def main():
-    # Clear output files at the start of the run
+    """
+    @brief Entry point to clear output files and process the configured language keys.
+
+    @return None
+    """
     open(RELEVANT_OUTPUT_FILE, 'w').close()
     open(IRRELEVANT_OUTPUT_FILE, 'w').close()
-    open(ERROR_OUTPUT_FILE, 'w').close()  # <-- NEW: Clear the error file too
+    open(ERROR_OUTPUT_FILE, 'w').close()
     print("Cleared all output files.")
 
     process_comments('rom_hindi')

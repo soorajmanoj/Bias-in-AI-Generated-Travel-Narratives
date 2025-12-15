@@ -6,9 +6,13 @@ import os
 
 sns.set(style="whitegrid", context="talk")
 
-# ============================================================
-# LOAD FILES
-# ============================================================
+"""
+@brief Load datasets used for poster figure generation.
+
+This module reads four JSON files containing human and Perspective API
+scores for two models (LLaMA and Qwen). The loaded variables are
+`llama_h`, `qwen_h`, `llama_p`, and `qwen_p`.
+"""
 
 with open("../counterspeech/outputs/llama32_scored_dataset_human.json") as f:
     llama_h = json.load(f)
@@ -22,10 +26,13 @@ with open("../counterspeech/outputs/qwen25_perspective_scores_final.json") as f:
 
 print("Loaded all four datasets.")
 
+"""
+@brief Convert JSON lists to pandas DataFrames and align rows by index.
 
-# ============================================================
-# CONVERT JSON LISTS TO DATAFRAMES AND ALIGN BY INDEX
-# ============================================================
+`human_df` converts human-annotated JSON entries into a DataFrame with
+explicit human score columns. `persp_df` converts Perspective API score
+entries into a DataFrame with corresponding perspective score columns.
+"""
 
 def human_df(data, model):
     rows = []
@@ -60,6 +67,7 @@ def persp_df(data, model):
         })
     return pd.DataFrame(rows)
 
+
 df_llama_h = human_df(llama_h, "llama")
 df_qwen_h  = human_df(qwen_h,  "qwen")
 
@@ -67,9 +75,12 @@ df_llama_p = persp_df(llama_p, "llama")
 df_qwen_p  = persp_df(qwen_p,  "qwen")
 
 
-# ============================================================
-# MERGE HUMAN + PERSPECTIVE BY INDEX
-# ============================================================
+"""@brief Merge human and Perspective DataFrames by index.
+
+Merge `df_llama_h` with `df_llama_p` and `df_qwen_h` with
+`df_qwen_p` on the `idx` and `model` columns so that rows align for
+paired comparisons.
+"""
 
 df_llama = df_llama_h.merge(df_llama_p, on=["idx","model"])
 df_qwen  = df_qwen_h.merge(df_qwen_p,  on=["idx","model"])
@@ -77,22 +88,24 @@ df_qwen  = df_qwen_h.merge(df_qwen_p,  on=["idx","model"])
 print("Merged llama rows:", len(df_llama))
 print("Merged qwen rows:", len(df_qwen))
 
+"""
+@brief Normalize human scores from a 1–5 scale to 0–1.
 
-# ============================================================
-# NORMALIZE HUMAN SCORES
-# ============================================================
+The original human annotations are on a 1–5 scale; this step divides
+those columns by 5. Perspective API scores are already in the 0–1 range.
+"""
 
 human_cols = ["toxicity_human","insult_human","profanity_human","sevtox_human","identatk_human"]
 for col in human_cols:
     df_llama[col + "_norm"] = df_llama[col] / 5.0
     df_qwen[col + "_norm"]  = df_qwen[col]  / 5.0
 
-# Perspective scores already 0–1
+"""
+@brief Build an index-aligned paired DataFrame merging LLaMA and Qwen rows.
 
-
-# ============================================================
-# BUILD INDEX-ALIGNED PAIRED DATAFRAME
-# ============================================================
+This constructs `df_paired` by truncating to the smaller dataset length
+and merging on the `idx` column to allow paired comparisons.
+"""
 
 max_len = min(len(df_llama), len(df_qwen))
 df_paired = df_llama.iloc[:max_len].merge(
@@ -104,13 +117,15 @@ df_paired = df_llama.iloc[:max_len].merge(
 
 print("Paired dataset size:", len(df_paired))
 
-# ============================================================
-# FIGURE X — Perspective API Difference: LLaMA - Qwen
-# ============================================================
+"""
+@brief Compute perspective differences between models.
+
+Creates `delta_persp_toxicity` (LLaMA − Qwen) and the mean perspective
+toxicity for Bland–Altman style plots.
+"""
 
 import numpy as np
 
-# Compute perspective differences
 df_paired["delta_persp_toxicity"] = (
     df_paired["toxicity_persp_llama"] - df_paired["toxicity_persp_qwen"]
 )
@@ -120,9 +135,9 @@ df_paired["mean_persp_toxicity"] = (
 ) / 2
 
 
-# ===============================
-# 1. Histogram + KDE of Differences
-# ===============================
+"""
+@brief Histogram and KDE of perspective toxicity differences.
+"""
 
 plt.figure(figsize=(12,6))
 sns.histplot(
@@ -141,9 +156,9 @@ plt.savefig("figures/fig_perspective_diff_hist.png", dpi=300)
 plt.close()
 
 
-# ===============================
-# 2. Scatter Plot (Difference by Comment Index)
-# ===============================
+"""
+@brief Scatter plot of perspective difference by comment index.
+"""
 
 plt.figure(figsize=(14,6))
 plt.scatter(
@@ -162,9 +177,9 @@ plt.savefig("figures/fig_perspective_diff_scatter.png", dpi=300)
 plt.close()
 
 
-# ============================================================
-# 3. Bland–Altman Plot (Highly Recommended)
-# ============================================================
+"""
+@brief Bland–Altman plot for perspective toxicity comparison.
+"""
 
 plt.figure(figsize=(12,6))
 plt.scatter(
@@ -190,9 +205,9 @@ plt.savefig("figures/fig_bland_altman_perspective.png", dpi=300)
 plt.close()
 
 
-# ============================================================
-# 4. (Optional) Difference for ALL 5 Toxicity Dimensions
-# ============================================================
+"""
+@brief Generate difference histograms for all five toxicity dimensions.
+"""
 
 dimensions = [
     ("toxicity_persp_llama","toxicity_persp_qwen","toxicity"),
@@ -216,18 +231,16 @@ for llama_col, qwen_col, name in dimensions:
 
 print("🎉 Perspective difference figures generated successfully!")
 
-
-
-# ============================================================
-# CREATE OUTPUT FOLDER
-# ============================================================
+"""
+@brief Ensure output folder exists for generated figures.
+"""
 
 os.makedirs("../counterspeech/outputs/figures", exist_ok=True)
 
 
-# ============================================================
-# FIGURE 1 — DISTRIBUTIONAL HUMAN TOXICITY
-# ============================================================
+"""
+@brief Figure 1 — Distributional human toxicity comparison.
+"""
 
 plt.figure(figsize=(12,6))
 sns.kdeplot(data=df_llama, x="toxicity_human", fill=True, label="LLaMA")
@@ -238,9 +251,9 @@ plt.savefig("figures/fig1_distribution_human.png", dpi=300)
 plt.close()
 
 
-# ============================================================
-# FIGURE 2 — CULTURAL BIAS BOX PLOT (FULL DATASETS)
-# ============================================================
+"""
+@brief Figure 2 — Cultural bias box plot across full datasets.
+"""
 
 plt.figure(figsize=(12,6))
 sns.boxplot(data=pd.concat([df_llama,df_qwen]), x="lang", y="toxicity_human", hue="model")
@@ -249,9 +262,9 @@ plt.savefig("figures/fig2_cultural_bias.png", dpi=300)
 plt.close()
 
 
-# ============================================================
-# FIGURE 3 — PAIRED SCATTER OF LLAMA VS QWEN HUMAN TOXICITY
-# ============================================================
+"""
+@brief Figure 3 — Paired scatter of LLaMA vs Qwen human toxicity.
+"""
 
 plt.figure(figsize=(8,8))
 plt.scatter(
@@ -266,9 +279,9 @@ plt.savefig("figures/fig3_paired_scatter.png", dpi=300)
 plt.close()
 
 
-# ============================================================
-# FIGURE 4 — PERSPECTIVE - HUMAN DIFFERENCE (PAIRED)
-# ============================================================
+"""
+@brief Figure 4 — Perspective minus human toxicity (paired KDEs).
+"""
 
 df_paired["diff_llama"] = df_paired["toxicity_persp_llama"] - df_paired["toxicity_human_norm_llama"]
 df_paired["diff_qwen"]  = df_paired["toxicity_persp_qwen"]  - df_paired["toxicity_human_norm_qwen"]
@@ -282,9 +295,9 @@ plt.savefig("figures/fig4_perspective_bias.png", dpi=300)
 plt.close()
 
 
-# ============================================================
-# FIGURE 5 — CORRELATION HEATMAP OF HUMAN SCORES (FULL DATASETS)
-# ============================================================
+"""
+@brief Figure 5 — Correlation heatmaps of human toxicity dimensions.
+"""
 
 plt.figure(figsize=(10,8))
 sns.heatmap(df_llama[human_cols].corr(), annot=True, cmap="coolwarm", vmin=-1, vmax=1)
@@ -299,9 +312,9 @@ plt.savefig("figures/fig5_qwen_heatmap.png", dpi=300)
 plt.close()
 
 
-# ============================================================
-# FIGURE 6 — TOXICITY DIMENSION VIOLIN PLOT
-# ============================================================
+"""
+@brief Figure 6 — Violin plots for toxicity dimensions by model.
+"""
 
 df_dim = pd.concat([df_llama.assign(model="LLaMA"), df_qwen.assign(model="Qwen")])
 
