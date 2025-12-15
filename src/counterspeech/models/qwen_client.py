@@ -2,21 +2,23 @@ import json
 import os
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
+import time
 
 # ============================================================
-# LOAD MODEL
+# LOAD MODEL (Qwen 2.5 - 3B - MPS/CPU)
 # ============================================================
 
-print("🔹 Loading Qwen2.5-3B-Instruct on mps...")
+print("🔹 Loading Qwen/Qwen2.5-3B-Instruct on mps...")
 
 device = "mps" if torch.backends.mps.is_available() else "cpu"
 
 tokenizer = AutoTokenizer.from_pretrained(
     "Qwen/Qwen2.5-3B-Instruct",
     trust_remote_code=True,
-    padding_side="left",
+    padding_side="left",     # REQUIRED for batching decoder models
 )
 
+# Qwen has pad token, but we ensure fallback
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -31,16 +33,16 @@ model.eval()
 model.generation_config.pad_token_id = tokenizer.pad_token_id
 model.generation_config.eos_token_id = tokenizer.eos_token_id
 
-print("✨ Model loaded successfully!")
+print("✨ Qwen model loaded successfully!")
 
 
 # ============================================================
 # LOAD INPUT FILE
 # ============================================================
 
-INPUT_FILE = "../../../data/clean/filtered/merged_output.json"
-PARTIAL_SAVE_FILE = "../outputs/qwen25_partial.json"
-FINAL_SAVE_FILE = "../outputs/qwen25_counterspeech_output.json"
+INPUT_FILE = "../../../data/clean/filtered/merged_output1.json"
+PARTIAL_SAVE_FILE = "../outputs/qwen_partial.json"
+FINAL_SAVE_FILE = "../outputs/qwen25_counterspeech_output_final.json"
 
 with open(INPUT_FILE, "r") as f:
     data = json.load(f)
@@ -53,19 +55,19 @@ print(f"📌 Loaded {len(english_comments)} English comments")
 
 
 # ============================================================
-# SYSTEM PROMPT (STRICT ANTI-HALLUCINATION)
+# STRICT SYSTEM PROMPT (ANTI-HALLUCINATION)
 # ============================================================
 
 SYSTEM_PROMPT = """
-You are a counterspeech generator. 
+You are a counterspeech generator.
 You MUST reply ONLY to the user's comment.
 
 Rules:
 - English only.
 - Stay on-topic.
-- No advice, explanations, or unrelated content.
-- 1–2 sentences.
-- Tone: sarcastic, rude, blunt, dismissive.
+- No advice, no explanations, no unrelated content.
+- 1–2 sentences maximum.
+- Tone allowed: sarcastic, rude, blunt, dismissive.
 """
 
 def build_prompt(comment: str) -> str:
@@ -94,10 +96,10 @@ def clean_output(text: str) -> str:
 
 
 # ============================================================
-# BATCH GENERATION
+# PARALLEL BATCH GENERATION (FAST + SAFE)
 # ============================================================
 
-def generate_counterspeech_batch(comments):
+def generate_batch(comments):
     prompts = [build_prompt(c) for c in comments]
 
     batch_inputs = tokenizer(
@@ -129,45 +131,44 @@ def batch(iterable, batch_size=16):
 
 
 # ============================================================
-# AUTO-RESUME SUPPORT
+# AUTO-RESUME (LOAD PARTIAL PROGRESS)
 # ============================================================
 
 output = []
 
 if os.path.exists(PARTIAL_SAVE_FILE):
-    print("🔄 Partial save detected — resuming from last progress...")
+    print("🔄 Resuming from existing partial output...")
     with open(PARTIAL_SAVE_FILE, "r") as f:
         output = json.load(f)
 else:
     print("🆕 Starting fresh run...")
 
-# Flatten comments
 all_comments = (
     [(c, "rom_hindi") for c in rom_hindi_comments] +
     [(c, "english") for c in english_comments]
 )
 
-# Skip already processed comments
 start_index = len(output)
-print(f"⏩ Resuming from comment #{start_index}")
+print(f"➡️ Starting from index {start_index}")
+print(f"⏱️ Start Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
 
 all_comments = all_comments[start_index:]
 
 
 # ============================================================
-# PROCESS & BATCH-SAVE
+# PROCESS COMMENTS WITH SAFE BATCH-SAVE
 # ============================================================
 
-print(f"📝 Processing {len(all_comments)} remaining comments...")
+print(f"📝 Processing remaining {len(all_comments)} comments...")
 
-BATCH_SIZE = 20
+BATCH_SIZE = 16  # adjust if needed
 
 for idx, comment_batch in enumerate(batch(all_comments, BATCH_SIZE), start=1):
+    start = time.time()
 
     texts = [c for c, lang in comment_batch]
-    replies = generate_counterspeech_batch(texts)
+    replies = generate_batch(texts)
 
-    # Append new batch to full output
     for (orig_comment, lang), reply in zip(comment_batch, replies):
         output.append({
             "comment": orig_comment,
@@ -175,11 +176,13 @@ for idx, comment_batch in enumerate(batch(all_comments, BATCH_SIZE), start=1):
             "counterspeech_english": reply
         })
 
-    # SAVE AFTER EVERY BATCH 💾
+    # crash-proof partial save
     with open(PARTIAL_SAVE_FILE, "w") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
-    print(f"  💾 Saved batch {idx} | Total processed: {len(output)}")
+    end = time.time()
+
+    print(f"  💾 Saved batch {idx} | Total processed: {len(output)} | time: {round(end - start, 2)} seconds")
 
 
 # ============================================================
@@ -189,10 +192,9 @@ for idx, comment_batch in enumerate(batch(all_comments, BATCH_SIZE), start=1):
 with open(FINAL_SAVE_FILE, "w") as f:
     json.dump(output, f, indent=2, ensure_ascii=False)
 
-print("🎉 ALL DONE — Final file saved!")
-print(f"💾 Final saved at: {FINAL_SAVE_FILE}")
+print("🎉 COMPLETED — Final output saved!")
+print(f"💾 File: {FINAL_SAVE_FILE}")
 
-# Remove partial file since job completed successfully
 if os.path.exists(PARTIAL_SAVE_FILE):
     os.remove(PARTIAL_SAVE_FILE)
-    print("🧹 Cleaned partial save file.")
+    print("🧹 Removed partial save file.")
