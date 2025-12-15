@@ -53,8 +53,8 @@ def score_comment(comment):
             return scores
 
         elif resp.status_code == 429:
-            print(" Rate limit exceeded — waiting 10 seconds...")
-            time.sleep(10)
+            print(" Rate limit exceeded — waiting 3 seconds...")
+            time.sleep(3)
             continue  # retry
 
         else:
@@ -63,8 +63,8 @@ def score_comment(comment):
 
 
 def main():
-    input_file = "../counterspeech/outputs/llama_partial.json"
-    output_file = "../counterspeech/outputs/llama32_perspective_scores_final.json"
+    input_file = "../../data/clean/filtered/qwen25_counterspeech_output_final.json"
+    output_file = "../counterspeech/outputs/qwen25_perspective_scores_final.json"
 
     print(f" Loading input: {input_file}")
     with open(input_file, "r", encoding="utf-8") as f:
@@ -96,7 +96,7 @@ def main():
                 json.dump(results, f, indent=2, ensure_ascii=False)
 
         # SAFE RATE LIMIT: 2 seconds
-        time.sleep(1.5)
+        time.sleep(1)
 
     print("\n Final save...")
     with open(output_file, "w", encoding="utf-8") as f:

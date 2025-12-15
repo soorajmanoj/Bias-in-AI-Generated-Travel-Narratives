@@ -42,7 +42,7 @@ print("✨ Model loaded successfully!")
 
 INPUT_FILE = "../../../data/clean/filtered/merged_output.json"
 PARTIAL_SAVE_FILE = "../outputs/llama_partial.json"
-FINAL_SAVE_FILE = "../outputs/llama32_counterspeech_output_final.json"
+FINAL_SAVE_FILE = "../../../data/clean/filtered/llama32_counterspeech_output_final.json"
 
 with open(INPUT_FILE, "r") as f:
     data = json.load(f)
