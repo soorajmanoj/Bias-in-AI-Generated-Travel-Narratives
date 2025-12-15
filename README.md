@@ -3,9 +3,6 @@
 This repository contains the full data processing, analysis, and evaluation pipeline for the project “Bias in AI-Generated Travel Narratives”.
 The project studies how large language models (LLMs) generate counterspeech for toxic or biased travel-related user comments and examines toxicity bias, cultural bias, and evaluation bias using both human annotations and automated toxicity scoring tools.
 
-Core principle:
-Models are instruments, not the focus.
-They are used as probes to reveal patterns of bias in generated counterspeech and in downstream evaluation systems.
 ---
 
 ## Project Overview
