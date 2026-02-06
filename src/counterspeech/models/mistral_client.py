@@ -1,46 +1,62 @@
 import json
 import os
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
 import time
+import torch
+from transformers import AutoTokenizer, pipeline
 
 """
-@file llama_client.py
-@brief Local LLaMA-based counterspeech generator utilities and batch processing harness.
-
-Loads a local LLaMA model, builds prompts, generates counterspeech in batches,
-supports auto-resume from partial runs, and saves final outputs.
+@file mistral_client.py
+@brief Ministral-3 counterspeech generator with batching + resume support.
 """
 
-print("🔹 Loading meta-llama/Llama-3.2-1B-Instruct on mps...")
+MODEL_NAME = "mistralai/Ministral-3-3B-Instruct-2512-BF16"
 
-device = "mps" if torch.backends.mps.is_available() else "cpu"
+print(f"🔹 Loading {MODEL_NAME}...")
+
+# -------------------- Device --------------------
+
+if torch.backends.mps.is_available():
+    device = "mps"
+    torch_dtype = torch.float16     # MPS does NOT support bf16
+elif torch.cuda.is_available():
+    device = "cuda"
+    torch_dtype = torch.bfloat16
+else:
+    device = "cpu"
+    torch_dtype = torch.float32
+
+# -------------------- Tokenizer --------------------
 
 tokenizer = AutoTokenizer.from_pretrained(
-    "meta-llama/Llama-3.2-1B-Instruct",
+    MODEL_NAME,
     trust_remote_code=True,
-    padding_side="left",
+    padding_side="left"
 )
 
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
-model = AutoModelForCausalLM.from_pretrained(
-    "meta-llama/Llama-3.2-1B-Instruct",
-    torch_dtype=torch.float16,
-    device_map=device,
+# -------------------- Text Generation Pipeline --------------------
+# THIS is the critical fix: pipeline has the correct routing
+
+generator = pipeline(
+    task="text-generation",
+    model=MODEL_NAME,
+    tokenizer=tokenizer,
+    device=device if device != "mps" else -1,  # HF pipeline uses -1 for MPS
+    torch_dtype=torch_dtype,
     trust_remote_code=True
 )
 
-model.eval()
-model.generation_config.pad_token_id = tokenizer.pad_token_id
-model.generation_config.eos_token_id = tokenizer.eos_token_id
-
 print("✨ Model loaded successfully!")
 
+# -------------------- Paths --------------------
+
 INPUT_FILE = "../../../data/clean/filtered/merged_output.json"
-PARTIAL_SAVE_FILE = "../outputs/llama_partial.json"
-FINAL_SAVE_FILE = "../../../data/clean/filtered/llama32_counterspeech_output_final.json"
+PARTIAL_SAVE_FILE = "../outputs/ministral_partial.json"
+FINAL_SAVE_FILE = "../../../data/clean/filtered/ministral_counterspeech_output_final.json"
+
+# -------------------- Load Data --------------------
 
 with open(INPUT_FILE, "r") as f:
     data = json.load(f)
@@ -51,94 +67,58 @@ english_comments = data.get("english", [])
 print(f"📌 Loaded {len(rom_hindi_comments)} Roman Hindi comments")
 print(f"📌 Loaded {len(english_comments)} English comments")
 
-SYSTEM_PROMPT = """
-You are a counterspeech generator. 
-You MUST reply ONLY to the user's comment.
+# -------------------- Prompt --------------------
 
-Rules:
-- English only.
-- Stay on-topic.
-- No advice, no explanations, no unrelated content.
-- 1–2 sentences maximum.
-- Tone allowed: sarcastic, rude, blunt, dismissive.
-"""
-
+SYSTEM_PROMPT = (
+    "You are a counterspeech generator.\n"
+    "You MUST reply ONLY to the user's comment.\n\n"
+    "Rules:\n"
+    "- English only.\n"
+    "- Stay on-topic.\n"
+    "- No advice, no explanations, no unrelated content.\n"
+    "- 1–2 sentences maximum.\n"
+    "- Tone "
+    ": sarcastic, rude, blunt, dismissive."
+)
 
 def build_prompt(comment: str) -> str:
-    """
-    @brief Build the system prompt and inject the comment to be responded to.
-
-    @param comment Original user comment string.
-    @return The full prompt string sent to the model.
-    """
     return (
+        "<s>[INST]\n"
         f"{SYSTEM_PROMPT}\n\n"
-        f"[COMMENT]: {comment}\n"
-        f"[RESPONSE]:"
+        f"User comment: {comment}\n"
+        "[/INST]"
     )
 
-
 def clean_output(text: str) -> str:
-    """
-    @brief Post-process generated text to extract only the response portion.
-
-    @param text Raw model output.
-    @return Cleaned response string.
-    """
-    if "[RESPONSE]:" in text:
-        text = text.split("[RESPONSE]:", 1)[-1]
-
-    if "User:" in text:
-        text = text.split("User:", 1)[0]
-
-    if "[COMMENT]:" in text:
-        text = text.split("[COMMENT]:", 1)[0]
-
+    if "[/INST]" in text:
+        text = text.split("[/INST]", 1)[-1]
     return text.strip()
 
+# -------------------- Generation --------------------
 
 def generate_batch(comments):
-    """
-    @brief Generate counterspeech for a list of comments using the local model.
-
-    @param comments List of comment strings.
-    @return List of generated responses.
-    """
     prompts = [build_prompt(c) for c in comments]
 
-    batch_inputs = tokenizer(
+    outputs = generator(
         prompts,
-        return_tensors="pt",
-        padding=True,
-        truncation=True
-    ).to(device)
+        max_new_tokens=60,
+        temperature=0.7,
+        top_p=0.9,
+        do_sample=True,
+        batch_size=len(prompts),
+        pad_token_id=tokenizer.pad_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+        return_full_text=False
+    )
 
-    with torch.inference_mode():
-        outputs = model.generate(
-            **batch_inputs,
-            max_new_tokens=60,
-            temperature=0.7,
-            top_p=0.9,
-            do_sample=True,
-            pad_token_id=tokenizer.pad_token_id,
-            eos_token_id=tokenizer.eos_token_id,
-        )
+    # HF pipeline returns list[ list[{generated_text}] ]
+    return [clean_output(o[0]["generated_text"]) for o in outputs]
 
-    decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-    cleaned = [clean_output(t) for t in decoded]
-    return cleaned
-
-
-def batch(iterable, batch_size=16):
-    """
-    @brief Yield successive batches from an iterable.
-
-    @param iterable List-like input.
-    @param batch_size Batch size.
-    """
+def batch(iterable, batch_size=8):   # smaller batch for MPS stability
     for i in range(0, len(iterable), batch_size):
         yield iterable[i:i + batch_size]
 
+# -------------------- Resume Logic --------------------
 
 output = []
 
@@ -155,19 +135,20 @@ all_comments = (
 )
 
 start_index = len(output)
-print(f"➡️ Starting from index {start_index}")
-print(f"⏱️  Start Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
-
 all_comments = all_comments[start_index:]
 
-print(f"📝 Processing remaining {len(all_comments)} comments...")
+print(f"➡️ Starting from index {start_index}")
+print(f"📝 Processing {len(all_comments)} remaining comments...")
+print(f"⏱️ Start Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-BATCH_SIZE = 16
+# -------------------- Run --------------------
+
+BATCH_SIZE = 8   # SAFE for Apple Silicon
 
 for idx, comment_batch in enumerate(batch(all_comments, BATCH_SIZE), start=1):
     start = time.time()
 
-    texts = [c for c, lang in comment_batch]
+    texts = [c for c, _ in comment_batch]
     replies = generate_batch(texts)
 
     for (orig_comment, lang), reply in zip(comment_batch, replies):
@@ -180,9 +161,12 @@ for idx, comment_batch in enumerate(batch(all_comments, BATCH_SIZE), start=1):
     with open(PARTIAL_SAVE_FILE, "w") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
-    end = time.time()
+    print(
+        f"💾 Batch {idx} | Total processed: {len(output)} "
+        f"| Time: {round(time.time() - start, 2)}s"
+    )
 
-    print(f"  💾 Saved batch {idx} | Total processed: {len(output)} | time: , {round(end - start, 2)}, seconds")
+# -------------------- Final Save --------------------
 
 with open(FINAL_SAVE_FILE, "w") as f:
     json.dump(output, f, indent=2, ensure_ascii=False)
