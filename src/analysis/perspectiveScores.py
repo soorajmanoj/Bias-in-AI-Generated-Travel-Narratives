@@ -82,8 +82,8 @@ def score_comment(comment):
 
 
 def main():
-    input_file = "../../data/clean/filtered/qwen25_counterspeech_output_final.json"
-    output_file = "../counterspeech/outputs/qwen25_perspective_scores_final.json"
+    input_file = "../../data/clean/filtered/gpt2_counterspeech_output_final.json"
+    output_file = "../counterspeech/outputs/gpt2_perspective_scores_final.json"
 
     print(f" Loading input: {input_file}")
     with open(input_file, "r", encoding="utf-8") as f:
