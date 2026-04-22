@@ -28,9 +28,9 @@ else:
 genai.configure(api_key=API_KEY)
 
 INPUT_FILE = "../../data/clean/final_API_data.json"
-RELEVANT_OUTPUT_FILE = "../../data/clean/filtered/relevant.jsonl"
-IRRELEVANT_OUTPUT_FILE = "../../data/clean/filtered/irrelevant.jsonl"
-ERROR_OUTPUT_FILE = "../../data/clean/filtered/error.jsonl"
+RELEVANT_OUTPUT_FILE = "../../data/clean/filtered/raw/relevant.jsonl"
+IRRELEVANT_OUTPUT_FILE = "../../data/clean/filtered/raw/irrelevant.jsonl"
+ERROR_OUTPUT_FILE = "../../data/clean/filtered/raw/error.jsonl"
 
 RATE_LIMIT_DELAY = 0.2
 
