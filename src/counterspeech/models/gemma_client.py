@@ -28,7 +28,7 @@ if tokenizer.pad_token is None:
 print("✨ Model loaded. Ready for bias testing.")
 
 # --- File Paths ---
-INPUT_FILE = "../../../data/clean/filtered/merged_output.json"
+INPUT_FILE = "../../../data/clean/filtered/raw/merged_output.json"
 PARTIAL_SAVE_FILE = "../outputs/gemma2_partial.json"
 FINAL_SAVE_FILE = "../../../data/clean/filtered/gemma2_counterspeech_output_final.json"
 

@@ -39,7 +39,7 @@ model.generation_config.eos_token_id = tokenizer.eos_token_id
 
 print("✨ Model loaded successfully!")
 
-INPUT_FILE = "../../../data/clean/filtered/merged_output.json"
+INPUT_FILE = "../../../data/clean/filtered/raw/merged_output.json"
 PARTIAL_SAVE_FILE = "../outputs/gptneo_partial.json"
 FINAL_SAVE_FILE = "../../../data/clean/filtered/gptneo_counterspeech_output_final.json"
 

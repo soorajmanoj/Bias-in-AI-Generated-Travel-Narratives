@@ -8,8 +8,8 @@ Reads `relevant.jsonl`, extracts `comment` values grouped by `language`, and wri
 the consolidated JSON file `merged_output.json` with `rom_hindi` and `english` lists.
 """
 
-input_file = "../../data/clean/filtered/relevant.jsonl"
-output_file = "../../data/clean/filtered/merged_output.json"
+input_file = "../../data/clean/filtered/raw/relevant.jsonl"
+output_file = "../../data/clean/filtered/raw/merged_output.json"
 
 rom_hindi_list = []
 english_list = []
